@@ -1,0 +1,48 @@
+name: vku-ai-student-support
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: vku-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: vku_student_support
+      POSTGRES_USER: vku_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
+    ports:
+      - "127.0.0.1:5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vku_user -d vku_student_support"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: vku-n8n
+    restart: unless-stopped
+
+    ports:
+      - "127.0.0.1:5678:5678"
+
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+      GENERIC_TIMEZONE: Asia/Ho_Chi_Minh
+      N8N_RUNNERS_ENABLED: "true"
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  n8n_data:
