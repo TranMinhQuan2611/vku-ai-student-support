@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "institution": "VKU",
+  "description": "Du lieu FAQ mau cho he thong VKU AI Student Support",
+  "faqs": [
+    {
+      "id": 1,
+      "category": "Đăng ký học phần",
+      "question": "Làm thế nào để đăng ký học phần tại VKU?",
+      "answer": "Bạn cần truy cập hệ thống đăng ký học phần do VKU cung cấp và làm theo hướng dẫn của nhà trường. Vui lòng kiểm tra thông báo chính thức để biết thời gian và quy trình đăng ký cụ thể.",
+      "keywords": [
+        "đăng ký học phần",
+        "đăng ký môn học",
+        "học phần"
+      ],
+      "source_type": "fallback",
+      "source_url": null,
+      "verified": false
+    },
+    {
+      "id": 2,
+      "category": "Ký túc xá",
+      "question": "Sinh viên VKU đăng ký ký túc xá như thế nào?",
+      "answer": "Bạn nên liên hệ bộ phận phụ trách ký túc xá hoặc theo dõi thông báo chính thức của VKU để được hướng dẫn về điều kiện, hồ sơ và thời gian đăng ký.",
+      "keywords": [
+        "ký túc xá",
+        "đăng ký ký túc xá",
+        "nội trú"
+      ],
+      "source_type": "fallback",
+      "source_url": null,
+      "verified": false
+    },
+    {
+      "id": 3,
+      "category": "Lịch thi",
+      "question": "Làm thế nào để xem lịch thi tại VKU?",
+      "answer": "Bạn có thể kiểm tra lịch thi thông qua hệ thống hoặc thông báo chính thức của VKU. Hãy đối chiếu thông tin trước ngày thi vì lịch thi có thể được điều chỉnh.",
+      "keywords": [
+        "lịch thi",
+        "xem lịch thi",
+        "thi học kỳ"
+      ],
+      "source_type": "fallback",
+      "source_url": null,
+      "verified": false
+    }
+  ]
+}
