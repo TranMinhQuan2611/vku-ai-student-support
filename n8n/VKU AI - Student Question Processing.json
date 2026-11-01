@@ -1,0 +1,144 @@
+{
+  "name": "VKU AI - Student Question Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "student-question",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "6326be84-d323-4c63-9234-d2c640a3b804",
+      "name": "Webhook",
+      "webhookId": "5ffae2ec-5b45-4975-9362-005cc9e04d6b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// VKU AI Student Support\n// Chuẩn hóa câu hỏi sinh viên nhận từ Webhook\n\nconst items = $input.all();\n\nreturn items.map((item) => {\n  const rawQuestion = item.json.body?.question;\n\n  const valid =\n    typeof rawQuestion === 'string' &&\n    rawQuestion.trim().length > 0;\n\n  const question = valid\n    ? rawQuestion.trim().replace(/\\s+/g, ' ')\n    : '';\n\n  const normalizedQuestion = question.toLocaleLowerCase('vi');\n\n  return {\n    json: {\n      question: question,\n      normalized_question: normalizedQuestion,\n      valid: valid,\n      timestamp: new Date().toISOString()\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "0bc668b9-818c-4efd-b510-718934349ed2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    id,\n    category,\n    question,\n    answer,\n    keywords,\n    verified\nFROM faqs\n  ORDER BY id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.8,
+      "position": [
+        448,
+        0
+      ],
+      "id": "0f3110e0-0375-43b0-ae94-4264aee4b2f9",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "6IBN7BFKtUzuXOwR",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Lấy câu hỏi đã được chuẩn hóa từ node trước\nconst input = $('Code in JavaScript').first().json;\n\nconst question = input.question;\nconst normalizedQuestion = input.normalized_question;\nconst valid = input.valid;\n\n// Lấy danh sách FAQ từ PostgreSQL\nconst faqs = $input.all().map(item => item.json);\n\n// Chuẩn hóa văn bản để so sánh\nfunction normalize(text) {\n  return String(text || '')\n    .toLocaleLowerCase('vi')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/đ/g, 'd')\n    .replace(/[^\\p{L}\\p{N}\\s]/gu, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n// Kiểm tra câu hỏi hợp lệ\nif (!valid) {\n  return [{\n    json: {\n      success: false,\n      question: question,\n      answer: 'Vui lòng nhập câu hỏi hợp lệ.',\n      matched: false\n    }\n  }];\n}\n\nconst searchText = normalize(normalizedQuestion);\n\nlet bestMatch = null;\nlet bestScore = 0;\n\n// Tìm FAQ phù hợp nhất\nfor (const faq of faqs) {\n  let score = 0;\n\n  const faqQuestion = normalize(faq.question);\n  const keywords = Array.isArray(faq.keywords)\n    ? faq.keywords\n    : [];\n\n  // Ưu tiên câu hỏi trùng khớp hoàn toàn\n  if (searchText === faqQuestion) {\n    score += 100;\n  }\n\n  // So sánh theo từ khóa\n  for (const keyword of keywords) {\n    const normalizedKeyword = normalize(keyword);\n\n    if (\n      normalizedKeyword &&\n      searchText.includes(normalizedKeyword)\n    ) {\n      score += 10;\n    }\n  }\n\n  if (score > bestScore) {\n    bestScore = score;\n    bestMatch = faq;\n  }\n}\n\n// Trường hợp tìm thấy FAQ\nif (bestMatch && bestScore > 0) {\n  return [{\n    json: {\n      success: true,\n      question: question,\n      answer: bestMatch.answer,\n      matched: true,\n      faq_id: bestMatch.id,\n      category: bestMatch.category,\n      score: bestScore,\n      verified: bestMatch.verified\n    }\n  }];\n}\n\n// Trường hợp không tìm thấy FAQ\nreturn [{\n  json: {\n    success: true,\n    question: question,\n    answer: 'Hiện tại hệ thống chưa có thông tin phù hợp với câu hỏi của bạn. Vui lòng liên hệ bộ phận hỗ trợ sinh viên VKU để được hướng dẫn.',\n    matched: false,\n    faq_id: null,\n    category: null,\n    score: 0,\n    verified: false\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "2b563dbf-8567-4624-b72e-cf40b3df1c41",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        896,
+        0
+      ],
+      "id": "63b378d7-129b-4a14-9aab-953f4c9c568e",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c2a0c09b-7649-47b9-a642-d364beea016e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "6aee891d9e6967f9d73c4d6bc6f33f4996933877a65289c00a14b8ec1fc75693"
+  },
+  "nodeGroups": [],
+  "id": "0TUsfEHVOqTc8tAO",
+  "tags": []
+}
