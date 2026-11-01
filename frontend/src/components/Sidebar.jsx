@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   GraduationCap,
   MessageCircle,
@@ -35,9 +34,7 @@ const menuItems = [
   },
 ];
 
-function Sidebar() {
-  const [activeItem, setActiveItem] = useState('chat');
-
+function Sidebar({ activeItem, onNavigate }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
@@ -69,7 +66,7 @@ function Sidebar() {
                   className={`sidebar-link ${
                     isActive ? 'active' : ''
                   }`}
-                  onClick={() => setActiveItem(item.id)}
+                  onClick={() => onNavigate(item.id)}
                 >
                   <Icon size={19} strokeWidth={2} />
 
