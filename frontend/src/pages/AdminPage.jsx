@@ -17,6 +17,9 @@ import {
   Sparkles,
   ShieldCheck,
   ExternalLink,
+  Plus,
+  X,
+  Save,
 } from 'lucide-react';
 
 import './AdminPage.css';
@@ -34,6 +37,13 @@ function AdminPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [savingFaq, setSavingFaq] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
+  const [newFaq, setNewFaq] = useState({
+    category: '', question: '', answer: '', source_url: ''
+  });
 
   // ==========================================
   // LẤY DỮ LIỆU TỪ BACKEND
@@ -152,6 +162,61 @@ function AdminPage() {
       return matchesSearch && matchesFilter;
     });
   }, [faqs, search, filter]);
+
+  // THÊM FAQ MỚI QUA BACKEND
+  const handleAddFaq = async (event) => {
+    event.preventDefault();
+    if (savingFaq) return;
+    setFormError('');
+    setFormSuccess('');
+
+    const payload = {
+      category: newFaq.category.trim(),
+      question: newFaq.question.trim(),
+      answer: newFaq.answer.trim(),
+      source_url: newFaq.source_url.trim() || null,
+    };
+    if (!payload.category || !payload.question || !payload.answer) {
+      setFormError('Vui lòng điền đầy đủ danh mục, câu hỏi và câu trả lời.');
+      return;
+    }
+    if (payload.question.length > 1000) {
+      setFormError('Câu hỏi không được vượt quá 1000 ký tự.');
+      return;
+    }
+    if (payload.source_url) {
+      try {
+        const url = new URL(payload.source_url);
+        if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid URL');
+      } catch {
+        setFormError('Đường dẫn nguồn phải bắt đầu bằng http:// hoặc https://.');
+        return;
+      }
+    }
+
+    setSavingFaq(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/faqs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || result.success !== true) {
+        throw new Error(result.message || 'Không thể thêm câu hỏi FAQ.');
+      }
+      setNewFaq({ category: '', question: '', answer: '', source_url: '' });
+      setSearch('');
+      setFilter('all');
+      setShowAddForm(false);
+      setFormSuccess('Đã thêm câu hỏi FAQ thành công.');
+      await loadDashboard();
+    } catch (err) {
+      setFormError(err.message || 'Không thể kết nối Backend.');
+    } finally {
+      setSavingFaq(false);
+    }
+  };
 
   const formatDate = (value) => {
     if (!value) return 'Chưa có thông tin';
@@ -316,10 +381,87 @@ function AdminPage() {
               </p>
             </div>
 
-            <span className="admin-count-badge">
-              {filteredFaqs.length} câu hỏi
-            </span>
+            <div className="admin-faq-heading-actions">
+              <span className="admin-count-badge">
+                {filteredFaqs.length} câu hỏi
+              </span>
+              <button
+                type="button"
+                className="admin-add-btn"
+                onClick={() => {
+                  setShowAddForm((value) => !value);
+                  setFormError('');
+                  setFormSuccess('');
+                }}
+              >
+                {showAddForm ? <X size={17} /> : <Plus size={17} />}
+                {showAddForm ? 'Đóng biểu mẫu' : 'Thêm câu hỏi'}
+              </button>
+            </div>
           </div>
+
+          {formSuccess && (
+            <div className="admin-form-success" role="status">
+              <CheckCircle2 size={18} /> {formSuccess}
+            </div>
+          )}
+
+          {showAddForm && (
+            <form className="admin-add-form" onSubmit={handleAddFaq}>
+              <h3>Thêm câu hỏi thường gặp</h3>
+              <p>FAQ mới sẽ được đánh dấu chưa xác minh.</p>
+              <div className="admin-form-grid">
+                <label>
+                  Danh mục <span>*</span>
+                  <input
+                    required
+                    maxLength={150}
+                    placeholder="Ví dụ: Học phí"
+                    value={newFaq.category}
+                    onChange={(e) => setNewFaq({ ...newFaq, category: e.target.value })}
+                  />
+                </label>
+                <label>
+                  Nguồn tham khảo (không bắt buộc)
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={newFaq.source_url}
+                    onChange={(e) => setNewFaq({ ...newFaq, source_url: e.target.value })}
+                  />
+                </label>
+              </div>
+              <label>
+                Câu hỏi <span>*</span>
+                <input
+                  required
+                  maxLength={1000}
+                  placeholder="Nhập câu hỏi..."
+                  value={newFaq.question}
+                  onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
+                />
+              </label>
+              <label>
+                Câu trả lời <span>*</span>
+                <textarea
+                  required
+                  rows={5}
+                  placeholder="Nhập câu trả lời..."
+                  value={newFaq.answer}
+                  onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
+                />
+              </label>
+              {formError && <div className="admin-form-error" role="alert">{formError}</div>}
+              <div className="admin-form-actions">
+                <button type="button" className="admin-cancel-btn" onClick={() => setShowAddForm(false)} disabled={savingFaq}>
+                  Hủy
+                </button>
+                <button type="submit" className="admin-add-btn" disabled={savingFaq}>
+                  <Save size={17} /> {savingFaq ? 'Đang lưu...' : 'Lưu câu hỏi'}
+                </button>
+              </div>
+            </form>
+          )}
 
           <div className="admin-toolbar">
             <div className="admin-search">
