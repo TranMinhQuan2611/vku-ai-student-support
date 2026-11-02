@@ -57,13 +57,14 @@ app.get('/api/health', (req, res) => {
 
 // ==========================================
 // API 2: GỬI CÂU HỎI ĐẾN N8N
+// VÀ TỰ ĐỘNG LƯU LỊCH SỬ
 // ==========================================
 
 app.post('/api/ask', async (req, res) => {
   try {
     const question = req.body?.question;
 
-    // Kiểm tra câu hỏi có hợp lệ không
+    // Kiểm tra câu hỏi hợp lệ
     if (
       typeof question !== 'string' ||
       !question.trim()
@@ -75,14 +76,16 @@ app.post('/api/ask', async (req, res) => {
     }
 
     // Giới hạn độ dài câu hỏi
-    if (question.trim().length > 1000) {
+    const cleanQuestion = question.trim();
+
+    if (cleanQuestion.length > 1000) {
       return res.status(400).json({
         success: false,
         message: 'Câu hỏi không được vượt quá 1000 ký tự.'
       });
     }
 
-    // Địa chỉ Webhook của n8n
+    // Địa chỉ Webhook n8n
     const webhookUrl =
       process.env.N8N_WEBHOOK_URL ||
       'http://localhost:5678/webhook/student-question';
@@ -91,7 +94,7 @@ app.post('/api/ask', async (req, res) => {
     const response = await axios.post(
       webhookUrl,
       {
-        question: question.trim()
+        question: cleanQuestion
       },
       {
         timeout: 15000,
@@ -101,8 +104,78 @@ app.post('/api/ask', async (req, res) => {
       }
     );
 
-    // Trả kết quả từ n8n về Frontend
-    return res.json(response.data);
+    // Dữ liệu phản hồi từ n8n
+    const aiResult = response.data;
+
+    // Kiểm tra phản hồi hợp lệ
+    if (
+      !aiResult ||
+      typeof aiResult !== 'object' ||
+      Array.isArray(aiResult) ||
+      aiResult.success === false ||
+      typeof aiResult.answer !== 'string' ||
+      !aiResult.answer.trim()
+    ) {
+      return res.status(502).json({
+        success: false,
+        message: 'Hệ thống AI trả về dữ liệu không hợp lệ.'
+      });
+    }
+
+    // ======================================
+    // LƯU LỊCH SỬ VÀO POSTGRESQL
+    // ======================================
+
+    try {
+      const saveResult = await pool.query(
+        `
+        INSERT INTO chat_history (
+          question,
+          answer,
+          matched,
+          faq_id,
+          category
+        )
+        VALUES ($1, $2, $3, $4, $5)
+        RETURNING id, created_at
+        `,
+        [
+          cleanQuestion,
+          aiResult.answer.trim(),
+          aiResult.matched === true,
+          Number.isInteger(Number(aiResult.faq_id)) &&
+          aiResult.faq_id !== null &&
+          aiResult.faq_id !== undefined &&
+          aiResult.faq_id !== ''
+            ? Number(aiResult.faq_id)
+            : null,
+          typeof aiResult.category === 'string'
+            ? aiResult.category
+            : null
+        ]
+      );
+
+      // Trả kết quả AI kèm ID lịch sử
+      return res.json({
+        ...aiResult,
+        history_id: saveResult.rows[0].id,
+        history_created_at: saveResult.rows[0].created_at
+      });
+
+    } catch (dbError) {
+      console.error(
+        'Lỗi lưu lịch sử hội thoại:',
+        dbError.message
+      );
+
+      // AI vẫn trả lời nếu PostgreSQL gặp lỗi.
+      // Không báo đã lưu thành công.
+      return res.json({
+        ...aiResult,
+        history_id: null,
+        history_saved: false
+      });
+    }
 
   } catch (error) {
     console.error(
@@ -124,7 +197,6 @@ app.post('/api/ask', async (req, res) => {
 
 app.get('/api/faqs', async (req, res) => {
   try {
-    // Truy vấn danh sách FAQ từ PostgreSQL
     const result = await pool.query(`
       SELECT
         id,
@@ -141,7 +213,6 @@ app.get('/api/faqs', async (req, res) => {
       ORDER BY id ASC
     `);
 
-    // Trả danh sách FAQ về Frontend
     return res.json({
       success: true,
       total: result.rows.length,
@@ -158,6 +229,127 @@ app.get('/api/faqs', async (req, res) => {
       success: false,
       message:
         'Không thể tải danh sách câu hỏi thường gặp.'
+    });
+  }
+});
+
+// ==========================================
+// API 4: LẤY LỊCH SỬ HỘI THOẠI
+// ==========================================
+
+app.get('/api/history', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        id,
+        question,
+        answer,
+        matched,
+        faq_id,
+        category,
+        created_at
+      FROM chat_history
+      ORDER BY created_at DESC, id DESC
+      LIMIT 100
+    `);
+
+    return res.json({
+      success: true,
+      total: result.rows.length,
+      history: result.rows
+    });
+
+  } catch (error) {
+    console.error(
+      'Lỗi lấy lịch sử hội thoại:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tải lịch sử hội thoại.'
+    });
+  }
+});
+
+// ==========================================
+// API 5: XÓA MỘT MỤC LỊCH SỬ
+// ==========================================
+
+app.delete('/api/history/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    if (
+      !Number.isSafeInteger(id) ||
+      id <= 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID lịch sử không hợp lệ.'
+      });
+    }
+
+    const result = await pool.query(
+      `
+      DELETE FROM chat_history
+      WHERE id = $1
+      RETURNING id
+      `,
+      [id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy lịch sử cần xóa.'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Đã xóa lịch sử thành công.',
+      deleted_id: id
+    });
+
+  } catch (error) {
+    console.error(
+      'Lỗi xóa lịch sử:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể xóa lịch sử hội thoại.'
+    });
+  }
+});
+
+// ==========================================
+// API 6: XÓA TOÀN BỘ LỊCH SỬ
+// ==========================================
+
+app.delete('/api/history', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      DELETE FROM chat_history
+    `);
+
+    return res.json({
+      success: true,
+      message: 'Đã xóa toàn bộ lịch sử hội thoại.',
+      deleted_count: result.rowCount
+    });
+
+  } catch (error) {
+    console.error(
+      'Lỗi xóa toàn bộ lịch sử:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể xóa toàn bộ lịch sử.'
     });
   }
 });
