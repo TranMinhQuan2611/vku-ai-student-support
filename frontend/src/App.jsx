@@ -1,53 +1,80 @@
 import { useState } from 'react';
 
+// ==========================================
+// IMPORT COMPONENTS
+// ==========================================
+
 import Sidebar from './components/Sidebar';
+
+// ==========================================
+// IMPORT PAGES
+// ==========================================
+
 import ChatPage from './pages/ChatPage';
 import FAQPage from './pages/FAQPage';
 import HistoryPage from './pages/HistoryPage';
+import AdminPage from './pages/AdminPage';
+
+// ==========================================
+// IMPORT CSS
+// ==========================================
 
 import './App.css';
 
+// ==========================================
+// MAIN APPLICATION
+// ==========================================
+
 function App() {
-  // Quản lý trang đang được chọn
   const [activePage, setActivePage] = useState('chat');
 
-  // Hiển thị nội dung theo mục được chọn trên Sidebar
+  // ========================================
+  // HIỂN THỊ TRANG THEO MENU
+  // ========================================
+
   const renderPage = () => {
     switch (activePage) {
+
+      // TRỢ LÝ AI
       case 'chat':
         return <ChatPage />;
 
+      // CÂU HỎI THƯỜNG GẶP
       case 'faq':
         return <FAQPage />;
 
+      // LỊCH SỬ HỘI THOẠI
       case 'history':
         return <HistoryPage />;
 
+      // QUẢN TRỊ HỆ THỐNG
       case 'admin':
-        return (
-          <div style={{ padding: '40px' }}>
-            <h1>Quản trị hệ thống</h1>
-            <p>Chức năng đang được phát triển.</p>
-          </div>
-        );
+        return <AdminPage />;
 
+      // MẶC ĐỊNH
       default:
         return <ChatPage />;
     }
   };
 
+  // ========================================
+  // GIAO DIỆN CHÍNH
+  // ========================================
+
   return (
     <div className="app-layout">
-      {/* Thanh điều hướng bên trái */}
+
+      {/* THANH ĐIỀU HƯỚNG */}
       <Sidebar
         activeItem={activePage}
         onNavigate={setActivePage}
       />
 
-      {/* Nội dung trang chính */}
+      {/* NỘI DUNG TRANG */}
       <main className="app-main">
         {renderPage()}
       </main>
+
     </div>
   );
 }

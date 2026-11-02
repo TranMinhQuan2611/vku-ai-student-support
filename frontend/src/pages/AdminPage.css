@@ -1,0 +1,759 @@
+/* ==========================================
+   VKU AI STUDENT SUPPORT
+   ADMIN DASHBOARD
+========================================== */
+
+.admin-page {
+  min-height: 100vh;
+  padding: 36px 32px 70px;
+  background: #f5f7ff;
+  color: #10254f;
+}
+
+.admin-container {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+/* ==========================================
+   HEADER
+========================================== */
+
+.admin-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+
+  padding: 30px 34px;
+  margin-bottom: 24px;
+
+  background: linear-gradient(
+    110deg,
+    #ffffff 0%,
+    #eef3ff 100%
+  );
+
+  border: 1px solid #dce6ff;
+  border-radius: 20px;
+}
+
+.admin-hero-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 8px 12px;
+  margin-bottom: 15px;
+
+  background: #eaf1ff;
+  color: #3268f5;
+
+  border-radius: 999px;
+
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.admin-hero h1 {
+  margin: 0 0 10px;
+
+  color: #10254f;
+  font-size: 29px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+}
+
+.admin-hero p {
+  margin: 0;
+  color: #8194bb;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.admin-hero-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 74px;
+  height: 74px;
+  flex-shrink: 0;
+
+  color: #3268f5;
+  background: #dfeaff;
+
+  border-radius: 20px;
+}
+
+/* ==========================================
+   STATISTICS
+========================================== */
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+
+  min-width: 0;
+  min-height: 100px;
+  padding: 20px;
+
+  background: #ffffff;
+  border: 1px solid #e0e8f8;
+  border-radius: 16px;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.admin-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(35, 70, 140, 0.07);
+}
+
+.admin-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+
+  border-radius: 14px;
+}
+
+.admin-stat-icon.blue {
+  color: #3268ff;
+  background: #eaf0ff;
+}
+
+.admin-stat-icon.green {
+  color: #0eae7a;
+  background: #e2f8ee;
+}
+
+.admin-stat-icon.orange {
+  color: #ed9a22;
+  background: #fff3df;
+}
+
+.admin-stat-icon.purple {
+  color: #9256ee;
+  background: #f0e9ff;
+}
+
+.admin-stat-card > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-stat-card strong {
+  color: #10254f;
+  font-size: 27px;
+  font-weight: 800;
+}
+
+.admin-stat-card span {
+  color: #8799bb;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* ==========================================
+   SYSTEM STATUS
+========================================== */
+
+.admin-system-card,
+.admin-faq-section {
+  padding: 26px;
+
+  background: #ffffff;
+  border: 1px solid #e0e8f8;
+  border-radius: 18px;
+}
+
+.admin-system-card {
+  margin-bottom: 24px;
+}
+
+.admin-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+
+  margin-bottom: 22px;
+}
+
+.admin-section-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  margin: 0 0 8px;
+
+  color: #10254f;
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.admin-section-heading h2 svg {
+  color: #3268f5;
+}
+
+.admin-section-heading p {
+  margin: 0;
+
+  color: #8799bb;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.admin-refresh-btn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+
+  padding: 11px 16px;
+
+  background: #ffffff;
+  color: #3268f5;
+
+  border: 1px solid #dce6ff;
+  border-radius: 11px;
+
+  font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.admin-refresh-btn:hover:not(:disabled) {
+  background: #edf3ff;
+}
+
+.admin-refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin-spinning {
+  animation: admin-spin 1s linear infinite;
+}
+
+@keyframes admin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-system-status {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+
+  padding: 18px;
+
+  background: #f8faff;
+  border: 1px solid #edf1fa;
+  border-radius: 14px;
+}
+
+.admin-system-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+
+  color: #3268f5;
+  background: #e8efff;
+
+  border-radius: 12px;
+}
+
+.admin-system-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-system-text strong {
+  font-size: 14px;
+  color: #10254f;
+}
+
+.admin-system-text span {
+  font-size: 12px;
+  color: #8799bb;
+}
+
+.admin-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+
+  padding: 9px 12px;
+
+  border-radius: 9px;
+
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-status-badge.online {
+  color: #0c9c6b;
+  background: #e3f8ed;
+}
+
+.admin-status-badge.offline {
+  color: #e34e5c;
+  background: #fff0f1;
+}
+
+/* ==========================================
+   FAQ MANAGEMENT
+========================================== */
+
+.admin-count-badge {
+  padding: 9px 13px;
+
+  color: #3268f5;
+  background: #edf3ff;
+
+  border-radius: 10px;
+
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.admin-toolbar {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+
+  margin-bottom: 22px;
+}
+
+.admin-search {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  flex: 1;
+  min-width: 0;
+
+  padding: 0 15px;
+
+  background: #ffffff;
+  border: 1px solid #dce5f5;
+  border-radius: 12px;
+
+  color: #8a9bbc;
+
+  transition: 0.2s;
+}
+
+.admin-search:focus-within {
+  border-color: #4074ff;
+  box-shadow: 0 0 0 3px rgba(64, 116, 255, 0.1);
+}
+
+.admin-search input {
+  width: 100%;
+  min-width: 0;
+  height: 46px;
+
+  background: transparent;
+  border: none;
+  outline: none;
+
+  color: #10254f;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.admin-search input::placeholder {
+  color: #9aabca;
+}
+
+.admin-filters {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 5px;
+
+  background: #f3f6fc;
+  border-radius: 12px;
+}
+
+.admin-filters button {
+  padding: 10px 12px;
+
+  background: transparent;
+  color: #8193b6;
+
+  border: none;
+  border-radius: 9px;
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+
+  cursor: pointer;
+  white-space: nowrap;
+  transition: 0.2s;
+}
+
+.admin-filters button:hover {
+  color: #3268f5;
+}
+
+.admin-filters button.active {
+  color: #3268f5;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(25, 60, 130, 0.07);
+}
+
+/* ==========================================
+   FAQ LIST
+========================================== */
+
+.admin-faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-faq-item {
+  overflow: hidden;
+
+  background: #ffffff;
+  border: 1px solid #e2e9f7;
+  border-radius: 14px;
+
+  transition: 0.2s;
+}
+
+.admin-faq-item:hover {
+  border-color: #b8ccff;
+}
+
+.admin-faq-item.expanded {
+  border-color: #8fb0ff;
+  box-shadow: 0 5px 20px rgba(40, 90, 190, 0.05);
+}
+
+.admin-faq-toggle {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+
+  width: 100%;
+  padding: 17px;
+
+  background: transparent;
+  border: none;
+
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.admin-faq-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+
+  color: #3268f5;
+  background: #edf3ff;
+
+  border-radius: 12px;
+}
+
+.admin-faq-title {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+
+  min-width: 0;
+}
+
+.admin-faq-title small {
+  color: #3268f5;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-faq-title strong {
+  color: #10254f;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.admin-faq-toggle > svg {
+  flex-shrink: 0;
+  color: #91a2c2;
+}
+
+.admin-verified-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 10px;
+
+  border-radius: 8px;
+
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-verified-badge.verified {
+  color: #0e9f70;
+  background: #e3f8ee;
+}
+
+.admin-verified-badge.unverified {
+  color: #d18a18;
+  background: #fff4df;
+}
+
+/* ==========================================
+   EXPANDED FAQ DETAILS
+========================================== */
+
+.admin-faq-details {
+  padding: 0 20px 20px 72px;
+  border-top: 1px solid #edf1f8;
+}
+
+.admin-faq-details h4 {
+  margin: 18px 0 10px;
+
+  color: #3268f5;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.admin-faq-details p {
+  margin: 0;
+
+  color: #64799f;
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-faq-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+
+  margin-top: 18px;
+
+  color: #8a9bbc;
+  font-size: 12px;
+}
+
+.admin-faq-meta strong {
+  color: #5e739a;
+}
+
+.admin-source-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  margin-top: 15px;
+
+  color: #3268f5;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.admin-source-link:hover {
+  text-decoration: underline;
+}
+
+.admin-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+
+  margin-top: 17px;
+  padding: 13px;
+
+  color: #b57b20;
+  background: #fff8e9;
+
+  border: 1px solid #ffedc8;
+  border-radius: 10px;
+
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.admin-warning svg {
+  flex-shrink: 0;
+}
+
+/* ==========================================
+   EMPTY AND ERROR STATES
+========================================== */
+
+.admin-empty {
+  padding: 65px 20px;
+
+  color: #8a9bbc;
+  background: #f9fbff;
+
+  border: 1px dashed #dce6fa;
+  border-radius: 14px;
+
+  text-align: center;
+  font-size: 14px;
+}
+
+.admin-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  padding: 14px;
+  margin-bottom: 18px;
+
+  color: #d94c5b;
+  background: #fff1f2;
+
+  border: 1px solid #ffdce0;
+  border-radius: 11px;
+
+  font-size: 13px;
+}
+
+/* ==========================================
+   RESPONSIVE
+========================================== */
+
+@media (max-width: 1200px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-filters {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-page {
+    padding: 20px 15px 45px;
+  }
+
+  .admin-hero {
+    padding: 23px;
+  }
+
+  .admin-hero h1 {
+    font-size: 24px;
+  }
+
+  .admin-hero-icon {
+    width: 55px;
+    height: 55px;
+  }
+
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-system-card,
+  .admin-faq-section {
+    padding: 18px;
+  }
+
+  .admin-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-system-status {
+    flex-wrap: wrap;
+  }
+
+  .admin-status-badge {
+    margin-left: 0;
+  }
+
+  .admin-filters {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .admin-faq-toggle {
+    flex-wrap: wrap;
+  }
+
+  .admin-verified-badge {
+    margin-left: 55px;
+  }
+
+  .admin-faq-details {
+    padding: 0 17px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-spinning {
+    animation: none;
+  }
+
+  .admin-stat-card,
+  .admin-faq-item,
+  .admin-refresh-btn {
+    transition: none;
+  }
+}
