@@ -21,11 +21,19 @@ import {
   X,
   Save,
   Pencil,
+  Trash2,
 } from 'lucide-react';
 
 import './AdminPage.css';
 
 const API_BASE = 'http://localhost:3001';
+
+const EMPTY_FAQ = {
+  category: '',
+  question: '',
+  answer: '',
+  source_url: '',
+};
 
 function AdminPage() {
   const [faqs, setFaqs] = useState([]);
@@ -38,17 +46,19 @@ function AdminPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
+
   const [showAddForm, setShowAddForm] = useState(false);
+  const [newFaq, setNewFaq] = useState({ ...EMPTY_FAQ });
   const [savingFaq, setSavingFaq] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+
   const [editingId, setEditingId] = useState(null);
-  const [editFaq, setEditFaq] = useState({ category: '', question: '', answer: '', source_url: '' });
+  const [editFaq, setEditFaq] = useState({ ...EMPTY_FAQ });
   const [editError, setEditError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
-  const [newFaq, setNewFaq] = useState({
-    category: '', question: '', answer: '', source_url: ''
-  });
+
+  const [deletingId, setDeletingId] = useState(null);
 
   // ==========================================
   // LẤY DỮ LIỆU TỪ BACKEND
@@ -65,14 +75,12 @@ function AdminPage() {
         fetch(`${API_BASE}/api/history`),
       ]);
 
-    // Kiểm tra Backend
     if (healthResult.status === 'fulfilled') {
       setBackendOnline(healthResult.value.ok);
     } else {
       setBackendOnline(false);
     }
 
-    // Lấy FAQ
     if (
       faqResult.status === 'fulfilled' &&
       faqResult.value.ok
@@ -95,7 +103,6 @@ function AdminPage() {
       setError('Không thể kết nối API FAQ.');
     }
 
-    // Lấy lịch sử
     if (
       historyResult.status === 'fulfilled' &&
       historyResult.value.ok
@@ -168,65 +175,124 @@ function AdminPage() {
     });
   }, [faqs, search, filter]);
 
-  // THÊM FAQ MỚI QUA BACKEND
+  // ==========================================
+  // KIỂM TRA DỮ LIỆU FAQ
+  // ==========================================
+
+  const validateFaq = (faq) => {
+    const payload = {
+      category: faq.category.trim(),
+      question: faq.question.trim(),
+      answer: faq.answer.trim(),
+      source_url: faq.source_url.trim() || null,
+    };
+
+    if (
+      !payload.category ||
+      !payload.question ||
+      !payload.answer
+    ) {
+      throw new Error(
+        'Vui lòng điền đầy đủ danh mục, câu hỏi và câu trả lời.'
+      );
+    }
+
+    if (
+      payload.category.length > 150 ||
+      payload.question.length > 1000
+    ) {
+      throw new Error(
+        'Danh mục tối đa 150 ký tự, câu hỏi tối đa 1000 ký tự.'
+      );
+    }
+
+    if (payload.source_url) {
+      let url;
+
+      try {
+        url = new URL(payload.source_url);
+      } catch {
+        throw new Error(
+          'Đường dẫn nguồn không hợp lệ.'
+        );
+      }
+
+      if (!['https:', 'http:'].includes(url.protocol)) {
+        throw new Error(
+          'Đường dẫn nguồn phải bắt đầu bằng http:// hoặc https://.'
+        );
+      }
+    }
+
+    return payload;
+  };
+
+  // ==========================================
+  // THÊM FAQ
+  // ==========================================
+
   const handleAddFaq = async (event) => {
     event.preventDefault();
+
     if (savingFaq) return;
+
     setFormError('');
     setFormSuccess('');
 
-    const payload = {
-      category: newFaq.category.trim(),
-      question: newFaq.question.trim(),
-      answer: newFaq.answer.trim(),
-      source_url: newFaq.source_url.trim() || null,
-    };
-    if (!payload.category || !payload.question || !payload.answer) {
-      setFormError('Vui lòng điền đầy đủ danh mục, câu hỏi và câu trả lời.');
+    let payload;
+
+    try {
+      payload = validateFaq(newFaq);
+    } catch (err) {
+      setFormError(err.message);
       return;
-    }
-    if (payload.question.length > 1000) {
-      setFormError('Câu hỏi không được vượt quá 1000 ký tự.');
-      return;
-    }
-    if (payload.source_url) {
-      try {
-        const url = new URL(payload.source_url);
-        if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid URL');
-      } catch {
-        setFormError('Đường dẫn nguồn phải bắt đầu bằng http:// hoặc https://.');
-        return;
-      }
     }
 
     setSavingFaq(true);
+
     try {
       const response = await fetch(`${API_BASE}/api/faqs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(payload),
       });
+
       const result = await response.json();
+
       if (!response.ok || result.success !== true) {
-        throw new Error(result.message || 'Không thể thêm câu hỏi FAQ.');
+        throw new Error(
+          result.message || 'Không thể thêm câu hỏi FAQ.'
+        );
       }
-      setNewFaq({ category: '', question: '', answer: '', source_url: '' });
+
+      setNewFaq({ ...EMPTY_FAQ });
       setSearch('');
       setFilter('all');
       setShowAddForm(false);
-      setFormSuccess('Đã thêm câu hỏi FAQ thành công.');
+
       await loadDashboard();
+
+      setFormSuccess('Đã thêm câu hỏi FAQ thành công.');
     } catch (err) {
-      setFormError(err.message || 'Không thể kết nối Backend.');
+      setFormError(
+        err.message || 'Không thể kết nối Backend.'
+      );
     } finally {
       setSavingFaq(false);
     }
   };
 
+  // ==========================================
+  // BẮT ĐẦU CHỈNH SỬA FAQ
+  // ==========================================
+
   const startEditing = (faq) => {
     setEditingId(faq.id);
     setExpandedId(faq.id);
     setEditError('');
+
     setEditFaq({
       category: faq.category || '',
       question: faq.question || '',
@@ -237,60 +303,138 @@ function AdminPage() {
 
   const cancelEditing = () => {
     if (savingEdit) return;
+
     setEditingId(null);
     setEditError('');
   };
 
+  // ==========================================
+  // CẬP NHẬT FAQ
+  // ==========================================
+
   const handleUpdateFaq = async (event) => {
     event.preventDefault();
+
     if (savingEdit || editingId === null) return;
+
     setEditError('');
     setFormSuccess('');
 
-    const payload = {
-      category: editFaq.category.trim(),
-      question: editFaq.question.trim(),
-      answer: editFaq.answer.trim(),
-      source_url: editFaq.source_url.trim() || null,
-    };
-    if (!payload.category || !payload.question || !payload.answer) {
-      setEditError('Vui lòng điền đầy đủ danh mục, câu hỏi và câu trả lời.');
+    let payload;
+
+    try {
+      payload = validateFaq(editFaq);
+    } catch (err) {
+      setEditError(err.message);
       return;
-    }
-    if (payload.category.length > 150 || payload.question.length > 1000) {
-      setEditError('Danh mục tối đa 150 ký tự, câu hỏi tối đa 1000 ký tự.');
-      return;
-    }
-    if (payload.source_url) {
-      try {
-        const url = new URL(payload.source_url);
-        if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid URL');
-      } catch {
-        setEditError('Đường dẫn nguồn phải bắt đầu bằng http:// hoặc https://.');
-        return;
-      }
     }
 
     setSavingEdit(true);
+
     try {
-      const response = await fetch(`${API_BASE}/api/faqs/${editingId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${API_BASE}/api/faqs/${editingId}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
       const result = await response.json();
+
       if (!response.ok || result.success !== true) {
-        throw new Error(result.message || 'Không thể cập nhật FAQ.');
+        throw new Error(
+          result.message || 'Không thể cập nhật FAQ.'
+        );
       }
+
       setEditingId(null);
-      setFormSuccess('Đã cập nhật câu hỏi FAQ thành công.');
+
       await loadDashboard();
+
+      setFormSuccess('Đã cập nhật câu hỏi FAQ thành công.');
     } catch (err) {
-      setEditError(err.message || 'Không thể kết nối Backend.');
+      setEditError(
+        err.message || 'Không thể kết nối Backend.'
+      );
     } finally {
       setSavingEdit(false);
     }
   };
+
+  // ==========================================
+  // XÓA FAQ
+  // ==========================================
+
+  const handleDelete = async (faq) => {
+    if (deletingId !== null || savingEdit) return;
+
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa câu hỏi sau không?\n\n` +
+      `"${faq.question}"\n\n` +
+      `Hành động này không thể hoàn tác.`
+    );
+
+    if (!confirmed) return;
+
+    setDeletingId(faq.id);
+    setFormSuccess('');
+    setError('');
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/faqs/${faq.id}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || result.success !== true) {
+        throw new Error(
+          result.message || 'Không thể xóa câu hỏi FAQ.'
+        );
+      }
+
+      // Cập nhật danh sách ngay sau khi xóa
+      setFaqs((previousFaqs) =>
+        previousFaqs.filter(
+          (item) => item.id !== faq.id
+        )
+      );
+
+      // Đóng FAQ vừa xóa
+      setExpandedId((currentId) =>
+        currentId === faq.id ? null : currentId
+      );
+
+      // Đóng biểu mẫu sửa nếu đang sửa FAQ này
+      if (editingId === faq.id) {
+        setEditingId(null);
+        setEditError('');
+      }
+
+      setFormSuccess(
+        'Đã xóa câu hỏi FAQ thành công.'
+      );
+    } catch (err) {
+      console.error('Lỗi xóa FAQ:', err);
+
+      setError(
+        err.message || 'Có lỗi xảy ra khi xóa câu hỏi.'
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  // ==========================================
+  // ĐỊNH DẠNG NGÀY
+  // ==========================================
 
   const formatDate = (value) => {
     if (!value) return 'Chưa có thông tin';
@@ -304,11 +448,16 @@ function AdminPage() {
     return date.toLocaleString('vi-VN');
   };
 
+  // ==========================================
+  // GIAO DIỆN
+  // ==========================================
+
   return (
     <div className="admin-page">
       <div className="admin-container">
 
         {/* HEADER */}
+
         <header className="admin-hero">
           <div className="admin-hero-content">
             <div className="admin-eyebrow">
@@ -330,14 +479,18 @@ function AdminPage() {
         </header>
 
         {/* THỐNG KÊ */}
+
         <section className="admin-stats">
+
           <div className="admin-stat-card">
             <div className="admin-stat-icon blue">
               <BookOpen size={23} />
             </div>
 
             <div>
-              <strong>{loading ? '...' : stats.total}</strong>
+              <strong>
+                {loading ? '...' : stats.total}
+              </strong>
               <span>Tổng số FAQ</span>
             </div>
           </div>
@@ -380,10 +533,13 @@ function AdminPage() {
               <span>Hội thoại gần đây (tối đa 100)</span>
             </div>
           </div>
+
         </section>
 
         {/* TRẠNG THÁI HỆ THỐNG */}
+
         <section className="admin-system-card">
+
           <div className="admin-section-heading">
             <div>
               <h2>
@@ -404,13 +560,16 @@ function AdminPage() {
             >
               <RefreshCw
                 size={17}
-                className={loading ? 'admin-spinning' : ''}
+                className={
+                  loading ? 'admin-spinning' : ''
+                }
               />
               Làm mới
             </button>
           </div>
 
           <div className="admin-system-status">
+
             <div className="admin-system-icon">
               <Database size={21} />
             </div>
@@ -437,11 +596,14 @@ function AdminPage() {
                 </>
               )}
             </div>
+
           </div>
         </section>
 
         {/* QUẢN LÝ FAQ */}
+
         <section className="admin-faq-section">
+
           <div className="admin-section-heading">
             <div>
               <h2>
@@ -456,9 +618,11 @@ function AdminPage() {
             </div>
 
             <div className="admin-faq-heading-actions">
+
               <span className="admin-count-badge">
                 {filteredFaqs.length} câu hỏi
               </span>
+
               <button
                 type="button"
                 className="admin-add-btn"
@@ -468,76 +632,156 @@ function AdminPage() {
                   setFormSuccess('');
                 }}
               >
-                {showAddForm ? <X size={17} /> : <Plus size={17} />}
-                {showAddForm ? 'Đóng biểu mẫu' : 'Thêm câu hỏi'}
+                {showAddForm ? (
+                  <X size={17} />
+                ) : (
+                  <Plus size={17} />
+                )}
+
+                {showAddForm
+                  ? 'Đóng biểu mẫu'
+                  : 'Thêm câu hỏi'}
               </button>
+
             </div>
           </div>
 
+          {/* THÔNG BÁO THÀNH CÔNG */}
+
           {formSuccess && (
-            <div className="admin-form-success" role="status">
-              <CheckCircle2 size={18} /> {formSuccess}
+            <div
+              className="admin-form-success"
+              role="status"
+            >
+              <CheckCircle2 size={18} />
+              {formSuccess}
             </div>
           )}
 
+          {/* BIỂU MẪU THÊM FAQ */}
+
           {showAddForm && (
-            <form className="admin-add-form" onSubmit={handleAddFaq}>
+            <form
+              className="admin-add-form"
+              onSubmit={handleAddFaq}
+            >
               <h3>Thêm câu hỏi thường gặp</h3>
-              <p>FAQ mới sẽ được đánh dấu chưa xác minh.</p>
+
+              <p>
+                FAQ mới sẽ được đánh dấu chưa xác minh.
+              </p>
+
               <div className="admin-form-grid">
+
                 <label>
                   Danh mục <span>*</span>
+
                   <input
                     required
                     maxLength={150}
                     placeholder="Ví dụ: Học phí"
                     value={newFaq.category}
-                    onChange={(e) => setNewFaq({ ...newFaq, category: e.target.value })}
+                    onChange={(e) =>
+                      setNewFaq({
+                        ...newFaq,
+                        category: e.target.value,
+                      })
+                    }
                   />
                 </label>
+
                 <label>
                   Nguồn tham khảo (không bắt buộc)
+
                   <input
                     type="url"
                     placeholder="https://..."
                     value={newFaq.source_url}
-                    onChange={(e) => setNewFaq({ ...newFaq, source_url: e.target.value })}
+                    onChange={(e) =>
+                      setNewFaq({
+                        ...newFaq,
+                        source_url: e.target.value,
+                      })
+                    }
                   />
                 </label>
+
               </div>
+
               <label>
                 Câu hỏi <span>*</span>
+
                 <input
                   required
                   maxLength={1000}
                   placeholder="Nhập câu hỏi..."
                   value={newFaq.question}
-                  onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
+                  onChange={(e) =>
+                    setNewFaq({
+                      ...newFaq,
+                      question: e.target.value,
+                    })
+                  }
                 />
               </label>
+
               <label>
                 Câu trả lời <span>*</span>
+
                 <textarea
                   required
                   rows={5}
                   placeholder="Nhập câu trả lời..."
                   value={newFaq.answer}
-                  onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
+                  onChange={(e) =>
+                    setNewFaq({
+                      ...newFaq,
+                      answer: e.target.value,
+                    })
+                  }
                 />
               </label>
-              {formError && <div className="admin-form-error" role="alert">{formError}</div>}
+
+              {formError && (
+                <div
+                  className="admin-form-error"
+                  role="alert"
+                >
+                  {formError}
+                </div>
+              )}
+
               <div className="admin-form-actions">
-                <button type="button" className="admin-cancel-btn" onClick={() => setShowAddForm(false)} disabled={savingFaq}>
+
+                <button
+                  type="button"
+                  className="admin-cancel-btn"
+                  onClick={() => setShowAddForm(false)}
+                  disabled={savingFaq}
+                >
                   Hủy
                 </button>
-                <button type="submit" className="admin-add-btn" disabled={savingFaq}>
-                  <Save size={17} /> {savingFaq ? 'Đang lưu...' : 'Lưu câu hỏi'}
+
+                <button
+                  type="submit"
+                  className="admin-add-btn"
+                  disabled={savingFaq}
+                >
+                  <Save size={17} />
+
+                  {savingFaq
+                    ? 'Đang lưu...'
+                    : 'Lưu câu hỏi'}
                 </button>
+
               </div>
             </form>
           )}
 
+          {/* THANH TÌM KIẾM VÀ BỘ LỌC */}
+
           <div className="admin-toolbar">
+
             <div className="admin-search">
               <Search size={19} />
 
@@ -552,9 +796,12 @@ function AdminPage() {
             </div>
 
             <div className="admin-filters">
+
               <button
                 type="button"
-                className={filter === 'all' ? 'active' : ''}
+                className={
+                  filter === 'all' ? 'active' : ''
+                }
                 onClick={() => setFilter('all')}
               >
                 Tất cả
@@ -579,8 +826,11 @@ function AdminPage() {
               >
                 Chưa xác minh
               </button>
+
             </div>
           </div>
+
+          {/* THÔNG BÁO LỖI */}
 
           {error && (
             <div className="admin-error">
@@ -588,6 +838,8 @@ function AdminPage() {
               {error}
             </div>
           )}
+
+          {/* DANH SÁCH FAQ */}
 
           {loading ? (
             <div className="admin-empty">
@@ -599,6 +851,7 @@ function AdminPage() {
             </div>
           ) : (
             <div className="admin-faq-list">
+
               {filteredFaqs.map((faq) => {
                 const expanded = expandedId === faq.id;
 
@@ -609,16 +862,24 @@ function AdminPage() {
                       expanded ? 'expanded' : ''
                     }`}
                   >
+
+                    {/* TIÊU ĐỀ FAQ */}
+
                     <button
                       type="button"
                       className="admin-faq-toggle"
-                      onClick={() =>
+                      onClick={() => {
+                        if (editingId === faq.id) {
+                          cancelEditing();
+                        }
+
                         setExpandedId(
                           expanded ? null : faq.id
-                        )
-                      }
+                        );
+                      }}
                       aria-expanded={expanded}
                     >
+
                       <div className="admin-faq-icon">
                         <BookOpen size={19} />
                       </div>
@@ -628,7 +889,9 @@ function AdminPage() {
                           {faq.category || 'Chưa phân loại'}
                         </small>
 
-                        <strong>{faq.question}</strong>
+                        <strong>
+                          {faq.question}
+                        </strong>
                       </div>
 
                       <span
@@ -648,95 +911,255 @@ function AdminPage() {
                       ) : (
                         <ChevronDown size={19} />
                       )}
+
                     </button>
+
+                    {/* CHI TIẾT FAQ */}
 
                     {expanded && (
                       <div className="admin-faq-details">
+
                         {editingId === faq.id ? (
-                          <form className="admin-edit-form" onSubmit={handleUpdateFaq}>
-                            <h3>Chỉnh sửa câu hỏi FAQ</h3>
+
+                          /* BIỂU MẪU SỬA FAQ */
+
+                          <form
+                            className="admin-edit-form"
+                            onSubmit={handleUpdateFaq}
+                          >
+
+                            <h3>
+                              Chỉnh sửa câu hỏi FAQ
+                            </h3>
+
                             <div className="admin-form-grid">
+
                               <label>
                                 Danh mục <span>*</span>
-                                <input required maxLength={150} value={editFaq.category}
-                                  onChange={(e) => setEditFaq({ ...editFaq, category: e.target.value })} />
+
+                                <input
+                                  required
+                                  maxLength={150}
+                                  value={editFaq.category}
+                                  onChange={(e) =>
+                                    setEditFaq({
+                                      ...editFaq,
+                                      category: e.target.value,
+                                    })
+                                  }
+                                />
                               </label>
+
                               <label>
                                 Nguồn tham khảo
-                                <input type="url" placeholder="https://..." value={editFaq.source_url}
-                                  onChange={(e) => setEditFaq({ ...editFaq, source_url: e.target.value })} />
+
+                                <input
+                                  type="url"
+                                  placeholder="https://..."
+                                  value={editFaq.source_url}
+                                  onChange={(e) =>
+                                    setEditFaq({
+                                      ...editFaq,
+                                      source_url: e.target.value,
+                                    })
+                                  }
+                                />
                               </label>
+
                             </div>
+
                             <label>
                               Câu hỏi <span>*</span>
-                              <input required maxLength={1000} value={editFaq.question}
-                                onChange={(e) => setEditFaq({ ...editFaq, question: e.target.value })} />
+
+                              <input
+                                required
+                                maxLength={1000}
+                                value={editFaq.question}
+                                onChange={(e) =>
+                                  setEditFaq({
+                                    ...editFaq,
+                                    question: e.target.value,
+                                  })
+                                }
+                              />
                             </label>
+
                             <label>
                               Câu trả lời <span>*</span>
-                              <textarea required rows={5} value={editFaq.answer}
-                                onChange={(e) => setEditFaq({ ...editFaq, answer: e.target.value })} />
+
+                              <textarea
+                                required
+                                rows={5}
+                                value={editFaq.answer}
+                                onChange={(e) =>
+                                  setEditFaq({
+                                    ...editFaq,
+                                    answer: e.target.value,
+                                  })
+                                }
+                              />
                             </label>
-                            {editError && <div className="admin-form-error" role="alert">{editError}</div>}
+
+                            {editError && (
+                              <div
+                                className="admin-form-error"
+                                role="alert"
+                              >
+                                {editError}
+                              </div>
+                            )}
+
                             <div className="admin-form-actions">
-                              <button type="button" className="admin-cancel-btn" onClick={cancelEditing} disabled={savingEdit}>Hủy</button>
-                              <button type="submit" className="admin-add-btn" disabled={savingEdit}>
-                                <Save size={17} /> {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+
+                              <button
+                                type="button"
+                                className="admin-cancel-btn"
+                                onClick={cancelEditing}
+                                disabled={savingEdit}
+                              >
+                                Hủy
                               </button>
+
+                              <button
+                                type="submit"
+                                className="admin-add-btn"
+                                disabled={savingEdit}
+                              >
+                                <Save size={17} />
+
+                                {savingEdit
+                                  ? 'Đang lưu...'
+                                  : 'Lưu thay đổi'}
+                              </button>
+
                             </div>
+
                           </form>
                         ) : (
                           <>
-                            <div className="admin-edit-actions">
-                              <button type="button" className="admin-edit-btn" onClick={() => startEditing(faq)}>
-                                <Pencil size={16} /> Sửa câu hỏi
+
+                            {/* NÚT SỬA VÀ XÓA */}
+
+                            <div
+                              className="admin-edit-actions"
+                              style={{
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                                gap: '10px',
+                                flexWrap: 'wrap',
+                              }}
+                            >
+
+                              <button
+                                type="button"
+                                className="admin-edit-btn"
+                                onClick={() =>
+                                  startEditing(faq)
+                                }
+                              >
+                                <Pencil size={16} />
+                                Sửa câu hỏi
                               </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDelete(faq)
+                                }
+                                disabled={deletingId !== null}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  padding: '10px 14px',
+                                  border: '1px solid #fecaca',
+                                  borderRadius: '9px',
+                                  background: '#fff1f2',
+                                  color: '#dc2626',
+                                  fontSize: '13px',
+                                  fontWeight: 650,
+                                  cursor:
+                                    deletingId !== null
+                                      ? 'not-allowed'
+                                      : 'pointer',
+                                  opacity:
+                                    deletingId !== null
+                                      ? 0.6
+                                      : 1,
+                                }}
+                              >
+                                <Trash2 size={16} />
+
+                                {deletingId === faq.id
+                                  ? 'Đang xóa...'
+                                  : 'Xóa câu hỏi'}
+                              </button>
+
                             </div>
+
+                            {/* CÂU TRẢ LỜI */}
+
                             <h4>Câu trả lời</h4>
 
-                        <p>{faq.answer}</p>
+                            <p>{faq.answer}</p>
 
-                        <div className="admin-faq-meta">
-                          <span>
-                            <strong>Nguồn:</strong>{' '}
-                            {faq.source_type || 'Chưa rõ'}
-                          </span>
+                            {/* THÔNG TIN FAQ */}
 
-                          <span>
-                            <strong>Cập nhật:</strong>{' '}
-                            {formatDate(faq.updated_at)}
-                          </span>
-                        </div>
+                            <div className="admin-faq-meta">
 
-                        {faq.source_url && (
-                          <a
-                            href={faq.source_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="admin-source-link"
-                          >
-                            Xem nguồn tham khảo
-                            <ExternalLink size={15} />
-                          </a>
-                        )}
+                              <span>
+                                <strong>Nguồn:</strong>{' '}
+                                {faq.source_type || 'Chưa rõ'}
+                              </span>
 
-                        {!faq.verified && (
-                          <div className="admin-warning">
-                            <AlertCircle size={17} />
-                            Nội dung này chưa được xác minh
-                            từ nguồn chính thức của VKU.
-                          </div>
-                        )}
+                              <span>
+                                <strong>Cập nhật:</strong>{' '}
+                                {formatDate(faq.updated_at)}
+                              </span>
+
+                            </div>
+
+                            {/* NGUỒN THAM KHẢO */}
+
+                            {faq.source_url && (
+                              <a
+                                href={faq.source_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="admin-source-link"
+                              >
+                                Xem nguồn tham khảo
+                                <ExternalLink size={15} />
+                              </a>
+                            )}
+
+                            {/* CẢNH BÁO CHƯA XÁC MINH */}
+
+                            {!faq.verified && (
+                              <div className="admin-warning">
+                                <AlertCircle size={17} />
+
+                                Nội dung này chưa được xác minh
+                                từ nguồn chính thức của VKU.
+                              </div>
+                            )}
+
                           </>
                         )}
+
                       </div>
                     )}
+
                   </article>
                 );
               })}
+
             </div>
           )}
+
         </section>
+
       </div>
     </div>
   );

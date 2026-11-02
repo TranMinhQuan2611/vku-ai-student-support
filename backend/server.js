@@ -588,6 +588,56 @@ app.put('/api/faqs/:id', async (req, res) => {
   }
 });
 // ==========================================
+// API: XÓA CÂU HỎI FAQ
+// ==========================================
+
+app.delete('/api/faqs/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+
+    // Kiểm tra ID
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID câu hỏi FAQ không hợp lệ.'
+      });
+    }
+
+    // Xóa FAQ khỏi PostgreSQL
+    const result = await pool.query(
+      `
+      DELETE FROM faqs
+      WHERE id = $1
+      RETURNING id, question
+      `,
+      [id]
+    );
+
+    // Không tìm thấy FAQ
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy câu hỏi FAQ cần xóa.'
+      });
+    }
+
+    // Xóa thành công
+    return res.json({
+      success: true,
+      message: 'Đã xóa câu hỏi FAQ thành công.',
+      deleted_faq: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Lỗi xóa FAQ:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể xóa câu hỏi FAQ.'
+    });
+  }
+});
+// ==========================================
 // KHỞI ĐỘNG BACKEND
 // ==========================================
 
