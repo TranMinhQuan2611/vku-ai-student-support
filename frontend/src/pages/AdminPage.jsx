@@ -20,6 +20,7 @@ import {
   Plus,
   X,
   Save,
+  Pencil,
 } from 'lucide-react';
 
 import './AdminPage.css';
@@ -41,6 +42,10 @@ function AdminPage() {
   const [savingFaq, setSavingFaq] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editFaq, setEditFaq] = useState({ category: '', question: '', answer: '', source_url: '' });
+  const [editError, setEditError] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const [newFaq, setNewFaq] = useState({
     category: '', question: '', answer: '', source_url: ''
   });
@@ -215,6 +220,75 @@ function AdminPage() {
       setFormError(err.message || 'Không thể kết nối Backend.');
     } finally {
       setSavingFaq(false);
+    }
+  };
+
+  const startEditing = (faq) => {
+    setEditingId(faq.id);
+    setExpandedId(faq.id);
+    setEditError('');
+    setEditFaq({
+      category: faq.category || '',
+      question: faq.question || '',
+      answer: faq.answer || '',
+      source_url: faq.source_url || '',
+    });
+  };
+
+  const cancelEditing = () => {
+    if (savingEdit) return;
+    setEditingId(null);
+    setEditError('');
+  };
+
+  const handleUpdateFaq = async (event) => {
+    event.preventDefault();
+    if (savingEdit || editingId === null) return;
+    setEditError('');
+    setFormSuccess('');
+
+    const payload = {
+      category: editFaq.category.trim(),
+      question: editFaq.question.trim(),
+      answer: editFaq.answer.trim(),
+      source_url: editFaq.source_url.trim() || null,
+    };
+    if (!payload.category || !payload.question || !payload.answer) {
+      setEditError('Vui lòng điền đầy đủ danh mục, câu hỏi và câu trả lời.');
+      return;
+    }
+    if (payload.category.length > 150 || payload.question.length > 1000) {
+      setEditError('Danh mục tối đa 150 ký tự, câu hỏi tối đa 1000 ký tự.');
+      return;
+    }
+    if (payload.source_url) {
+      try {
+        const url = new URL(payload.source_url);
+        if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Invalid URL');
+      } catch {
+        setEditError('Đường dẫn nguồn phải bắt đầu bằng http:// hoặc https://.');
+        return;
+      }
+    }
+
+    setSavingEdit(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/faqs/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || result.success !== true) {
+        throw new Error(result.message || 'Không thể cập nhật FAQ.');
+      }
+      setEditingId(null);
+      setFormSuccess('Đã cập nhật câu hỏi FAQ thành công.');
+      await loadDashboard();
+    } catch (err) {
+      setEditError(err.message || 'Không thể kết nối Backend.');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -578,7 +652,47 @@ function AdminPage() {
 
                     {expanded && (
                       <div className="admin-faq-details">
-                        <h4>Câu trả lời</h4>
+                        {editingId === faq.id ? (
+                          <form className="admin-edit-form" onSubmit={handleUpdateFaq}>
+                            <h3>Chỉnh sửa câu hỏi FAQ</h3>
+                            <div className="admin-form-grid">
+                              <label>
+                                Danh mục <span>*</span>
+                                <input required maxLength={150} value={editFaq.category}
+                                  onChange={(e) => setEditFaq({ ...editFaq, category: e.target.value })} />
+                              </label>
+                              <label>
+                                Nguồn tham khảo
+                                <input type="url" placeholder="https://..." value={editFaq.source_url}
+                                  onChange={(e) => setEditFaq({ ...editFaq, source_url: e.target.value })} />
+                              </label>
+                            </div>
+                            <label>
+                              Câu hỏi <span>*</span>
+                              <input required maxLength={1000} value={editFaq.question}
+                                onChange={(e) => setEditFaq({ ...editFaq, question: e.target.value })} />
+                            </label>
+                            <label>
+                              Câu trả lời <span>*</span>
+                              <textarea required rows={5} value={editFaq.answer}
+                                onChange={(e) => setEditFaq({ ...editFaq, answer: e.target.value })} />
+                            </label>
+                            {editError && <div className="admin-form-error" role="alert">{editError}</div>}
+                            <div className="admin-form-actions">
+                              <button type="button" className="admin-cancel-btn" onClick={cancelEditing} disabled={savingEdit}>Hủy</button>
+                              <button type="submit" className="admin-add-btn" disabled={savingEdit}>
+                                <Save size={17} /> {savingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            <div className="admin-edit-actions">
+                              <button type="button" className="admin-edit-btn" onClick={() => startEditing(faq)}>
+                                <Pencil size={16} /> Sửa câu hỏi
+                              </button>
+                            </div>
+                            <h4>Câu trả lời</h4>
 
                         <p>{faq.answer}</p>
 
@@ -612,6 +726,8 @@ function AdminPage() {
                             Nội dung này chưa được xác minh
                             từ nguồn chính thức của VKU.
                           </div>
+                        )}
+                          </>
                         )}
                       </div>
                     )}

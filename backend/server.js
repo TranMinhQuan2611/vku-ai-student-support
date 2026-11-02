@@ -355,6 +355,239 @@ app.delete('/api/history', async (req, res) => {
 });
 
 // ==========================================
+// API 7: THÊM CÂU HỎI FAQ
+// ==========================================
+
+app.post('/api/faqs', async (req, res) => {
+  try {
+    const { category, question, answer } = req.body || {};
+
+    // ======================================
+    // KIỂM TRA DỮ LIỆU ĐẦU VÀO
+    // ======================================
+
+    if (
+      typeof category !== 'string' ||
+      typeof question !== 'string' ||
+      typeof answer !== 'string' ||
+      !category.trim() ||
+      !question.trim() ||
+      !answer.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Vui lòng nhập đầy đủ danh mục, câu hỏi và câu trả lời.'
+      });
+    }
+
+    // ======================================
+    // CHUẨN HÓA DỮ LIỆU
+    // ======================================
+
+    const cleanCategory = category.trim();
+    const cleanQuestion = question.trim();
+    const cleanAnswer = answer.trim();
+
+    // ======================================
+    // KIỂM TRA ĐỘ DÀI
+    // ======================================
+
+    if (cleanCategory.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Tên danh mục không được vượt quá 100 ký tự.'
+      });
+    }
+
+    if (cleanQuestion.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Câu hỏi không được vượt quá 1000 ký tự.'
+      });
+    }
+
+    if (cleanAnswer.length > 10000) {
+      return res.status(400).json({
+        success: false,
+        message:
+          'Câu trả lời không được vượt quá 10000 ký tự.'
+      });
+    }
+
+    // ======================================
+    // LƯU FAQ VÀO POSTGRESQL
+    // ======================================
+
+    const result = await pool.query(
+      `
+      INSERT INTO faqs (
+        category,
+        question,
+        answer,
+        keywords,
+        source_type,
+        verified
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING
+        id,
+        category,
+        question,
+        answer,
+        keywords,
+        source_type,
+        source_url,
+        verified,
+        created_at,
+        updated_at
+      `,
+      [
+        cleanCategory,
+        cleanQuestion,
+        cleanAnswer,
+        [],
+        'manual',
+        false
+      ]
+    );
+
+    // ======================================
+    // TRẢ KẾT QUẢ THÀNH CÔNG
+    // ======================================
+
+    return res.status(201).json({
+      success: true,
+      message: 'Thêm câu hỏi FAQ thành công.',
+      faq: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error(
+      'Lỗi thêm FAQ:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message:
+        'Không thể thêm câu hỏi FAQ. Vui lòng thử lại.'
+    });
+  }
+});
+
+// ==========================================
+// API 8: CẬP NHẬT CÂU HỎI FAQ
+// ==========================================
+
+app.put('/api/faqs/:id', async (req, res) => {
+  try {
+    // Lấy ID câu hỏi
+    const id = Number(req.params.id);
+
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID câu hỏi FAQ không hợp lệ.'
+      });
+    }
+
+    // Lấy dữ liệu từ frontend
+    const {
+      category,
+      question,
+      answer,
+      source_url
+    } = req.body || {};
+
+    // Kiểm tra dữ liệu bắt buộc
+    if (
+      typeof category !== 'string' ||
+      !category.trim() ||
+      typeof question !== 'string' ||
+      !question.trim() ||
+      typeof answer !== 'string' ||
+      !answer.trim()
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ danh mục, câu hỏi và câu trả lời.'
+      });
+    }
+
+    // Kiểm tra nguồn tham khảo
+    if (
+      source_url !== undefined &&
+      source_url !== null &&
+      typeof source_url !== 'string'
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nguồn tham khảo không hợp lệ.'
+      });
+    }
+
+    const cleanCategory = category.trim();
+    const cleanQuestion = question.trim();
+    const cleanAnswer = answer.trim();
+    const cleanSourceUrl =
+      typeof source_url === 'string'
+        ? source_url.trim() || null
+        : null;
+
+    // Cập nhật dữ liệu PostgreSQL
+    const result = await pool.query(
+      `
+      UPDATE faqs
+      SET
+        category = $1,
+        question = $2,
+        answer = $3,
+        source_url = $4,
+        verified = false,
+        updated_at = NOW()
+      WHERE id = $5
+      RETURNING *
+      `,
+      [
+        cleanCategory,
+        cleanQuestion,
+        cleanAnswer,
+        cleanSourceUrl,
+        id
+      ]
+    );
+
+    // Không tìm thấy câu hỏi
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy câu hỏi FAQ cần sửa.'
+      });
+    }
+
+    // Trả kết quả thành công
+    return res.json({
+      success: true,
+      message: 'Cập nhật câu hỏi FAQ thành công.',
+      faq: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error(
+      'Lỗi cập nhật FAQ:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể cập nhật câu hỏi FAQ. Vui lòng thử lại.'
+    });
+  }
+});
+// ==========================================
 // KHỞI ĐỘNG BACKEND
 // ==========================================
 
