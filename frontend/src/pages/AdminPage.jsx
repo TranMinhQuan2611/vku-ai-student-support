@@ -59,6 +59,7 @@ function AdminPage() {
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [deletingId, setDeletingId] = useState(null);
+  const [verifyingId, setVerifyingId] = useState(null);
 
   // ==========================================
   // LẤY DỮ LIỆU TỪ BACKEND
@@ -370,7 +371,11 @@ function AdminPage() {
   // ==========================================
 
   const handleDelete = async (faq) => {
-    if (deletingId !== null || savingEdit) return;
+    if (
+      deletingId !== null ||
+      savingEdit ||
+      verifyingId !== null
+    ) return;
 
     const confirmed = window.confirm(
       `Bạn có chắc chắn muốn xóa câu hỏi sau không?\n\n` +
@@ -429,6 +434,76 @@ function AdminPage() {
       );
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  // ==========================================
+  // XÁC MINH / HỦY XÁC MINH FAQ
+  // ==========================================
+
+  const handleVerify = async (faq) => {
+    if (
+      verifyingId !== null ||
+      deletingId !== null ||
+      savingEdit
+    ) return;
+
+    const newVerifiedStatus = faq.verified !== true;
+
+    setVerifyingId(faq.id);
+    setFormSuccess('');
+    setError('');
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/faqs/${faq.id}/verify`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            verified: newVerifiedStatus,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || result.success !== true) {
+        throw new Error(
+          result.message ||
+          'Không thể cập nhật trạng thái xác minh FAQ.'
+        );
+      }
+
+      // Cập nhật trạng thái FAQ ngay lập tức
+      setFaqs((previousFaqs) =>
+        previousFaqs.map((item) =>
+          item.id === faq.id
+            ? {
+                ...item,
+                verified: newVerifiedStatus,
+              }
+            : item
+        )
+      );
+
+      setFormSuccess(
+        newVerifiedStatus
+          ? 'Đã xác minh câu hỏi FAQ thành công.'
+          : 'Đã hủy xác minh câu hỏi FAQ thành công.'
+      );
+
+    } catch (err) {
+      console.error('Lỗi xác minh FAQ:', err);
+
+      setError(
+        err.message ||
+        'Không thể kết nối Backend.'
+      );
+    } finally {
+      setVerifyingId(null);
     }
   };
 
@@ -1038,7 +1113,7 @@ function AdminPage() {
                         ) : (
                           <>
 
-                            {/* NÚT SỬA VÀ XÓA */}
+                            {/* CÁC NÚT THAO TÁC FAQ */}
 
                             <div
                               className="admin-edit-actions"
@@ -1050,23 +1125,95 @@ function AdminPage() {
                               }}
                             >
 
+                              {/* NÚT XÁC MINH / HỦY XÁC MINH */}
+
+                              <button
+                                type="button"
+                                onClick={() => handleVerify(faq)}
+                                disabled={
+                                  verifyingId !== null ||
+                                  deletingId !== null ||
+                                  savingEdit
+                                }
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  gap: '8px',
+                                  padding: '10px 14px',
+                                  border: faq.verified
+                                    ? '1px solid #fed7aa'
+                                    : '1px solid #a7f3d0',
+                                  borderRadius: '9px',
+                                  background: faq.verified
+                                    ? '#fff7ed'
+                                    : '#ecfdf5',
+                                  color: faq.verified
+                                    ? '#ea580c'
+                                    : '#059669',
+                                  fontSize: '13px',
+                                  fontWeight: 650,
+                                  cursor:
+                                    verifyingId !== null
+                                      ? 'not-allowed'
+                                      : 'pointer',
+                                  opacity:
+                                    verifyingId !== null
+                                      ? 0.6
+                                      : 1,
+                                }}
+                              >
+
+                                {verifyingId === faq.id ? (
+                                  <>
+                                    <RefreshCw
+                                      size={16}
+                                      className="admin-spinning"
+                                    />
+                                    Đang xử lý...
+                                  </>
+                                ) : faq.verified ? (
+                                  <>
+                                    <XCircle size={16} />
+                                    Hủy xác minh
+                                  </>
+                                ) : (
+                                  <>
+                                    <BadgeCheck size={16} />
+                                    Xác minh FAQ
+                                  </>
+                                )}
+
+                              </button>
+
+                              {/* NÚT SỬA */}
+
                               <button
                                 type="button"
                                 className="admin-edit-btn"
                                 onClick={() =>
                                   startEditing(faq)
                                 }
+                                disabled={
+                                  verifyingId !== null ||
+                                  deletingId !== null
+                                }
                               >
                                 <Pencil size={16} />
                                 Sửa câu hỏi
                               </button>
+
+                              {/* NÚT XÓA */}
 
                               <button
                                 type="button"
                                 onClick={() =>
                                   handleDelete(faq)
                                 }
-                                disabled={deletingId !== null}
+                                disabled={
+                                  deletingId !== null ||
+                                  verifyingId !== null
+                                }
                                 style={{
                                   display: 'inline-flex',
                                   alignItems: 'center',

@@ -638,6 +638,70 @@ app.delete('/api/faqs/:id', async (req, res) => {
   }
 });
 // ==========================================
+// API 10: XÁC MINH / HỦY XÁC MINH FAQ
+// ==========================================
+
+app.patch('/api/faqs/:id/verify', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { verified } = req.body || {};
+
+    // Kiểm tra ID
+    if (!Number.isSafeInteger(id) || id <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID câu hỏi FAQ không hợp lệ.'
+      });
+    }
+
+    // Kiểm tra trạng thái xác minh
+    if (typeof verified !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        message: 'Trạng thái xác minh phải là true hoặc false.'
+      });
+    }
+
+    // Cập nhật trạng thái trong PostgreSQL
+    const result = await pool.query(
+      `
+        UPDATE faqs
+        SET
+          verified = $1,
+          updated_at = NOW()
+        WHERE id = $2
+        RETURNING *
+      `,
+      [verified, id]
+    );
+
+    // Không tìm thấy câu hỏi
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy câu hỏi FAQ.'
+      });
+    }
+
+    // Trả kết quả
+    return res.json({
+      success: true,
+      message: verified
+        ? 'Xác minh câu hỏi FAQ thành công.'
+        : 'Đã hủy xác minh câu hỏi FAQ.',
+      faq: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Lỗi xác minh FAQ:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể cập nhật trạng thái xác minh FAQ.'
+    });
+  }
+});
+// ==========================================
 // KHỞI ĐỘNG BACKEND
 // ==========================================
 
