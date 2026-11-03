@@ -702,6 +702,99 @@ app.patch('/api/faqs/:id/verify', async (req, res) => {
   }
 });
 // ==========================================
+// API GOOGLE TEXT TO SPEECH
+// ==========================================
+
+app.post('/api/tts', async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    // Kiểm tra nội dung
+    if (typeof text !== 'string' || !text.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng cung cấp văn bản cần đọc.'
+      });
+    }
+
+    // Giới hạn độ dài văn bản
+    if (text.length > 1000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Văn bản không được vượt quá 1000 ký tự.'
+      });
+    }
+
+    const { spawn } = require('child_process');
+
+    const pythonPath = path.join(__dirname, '../.venv-tts/bin/python');
+    const scriptPath = path.join(__dirname, 'google_tts_service.py');
+
+    const python = spawn(pythonPath, [
+      scriptPath,
+      text,
+      '-'
+    ]);
+
+    const audioChunks = [];
+    let errorOutput = '';
+
+    python.stdout.on('data', (chunk) => {
+      audioChunks.push(chunk);
+    });
+
+    python.stderr.on('data', (chunk) => {
+      errorOutput += chunk.toString();
+    });
+
+    python.on('error', (error) => {
+      console.error('Không thể chạy Python TTS:', error.message);
+
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Không thể khởi động dịch vụ giọng nói.'
+        });
+      }
+    });
+
+    python.on('close', (code) => {
+      if (res.headersSent) return;
+
+      if (code !== 0) {
+        console.error('Google TTS lỗi:', errorOutput);
+
+        return res.status(500).json({
+          success: false,
+          message: 'Không thể tạo giọng nói.'
+        });
+      }
+
+      const audioBuffer = Buffer.concat(audioChunks);
+
+      if (audioBuffer.length === 0) {
+        return res.status(500).json({
+          success: false,
+          message: 'Không nhận được dữ liệu âm thanh.'
+        });
+      }
+
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Cache-Control', 'no-store');
+
+      return res.send(audioBuffer);
+    });
+
+  } catch (error) {
+    console.error('Lỗi API TTS:', error.message);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Đã xảy ra lỗi khi tạo giọng nói.'
+    });
+  }
+});
+// ==========================================
 // KHỞI ĐỘNG BACKEND
 // ==========================================
 

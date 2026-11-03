@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Sparkles,
   Send,
@@ -16,6 +16,7 @@ import './ChatPage.css';
 
 // Địa chỉ Backend
 const API_URL = 'http://localhost:3001/api/ask';
+const TTS_URL = 'http://localhost:3001/api/tts';
 
 // Các câu hỏi gợi ý
 const suggestions = [
@@ -50,6 +51,35 @@ function ChatPage() {
 
   // Trạng thái chờ AI
   const [isLoading, setIsLoading] = useState(false);
+
+  const audioRef = useRef(null);
+  const audioUrlRef = useRef(null);
+  const requestRef = useRef(null);
+  const [speakingId, setSpeakingId] = useState(null);
+
+  const stopAudio = () => {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+      audioRef.current = null;
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+    setSpeakingId(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      requestRef.current?.abort();
+      audioRef.current?.pause();
+      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    };
+  }, []);
 
   // Gửi câu hỏi đến Backend
   const handleSend = async (question = input) => {
@@ -153,80 +183,60 @@ function ChatPage() {
     }
   };
 
-  // Đọc câu trả lời bằng giọng nói
-  const handleSpeak = (text) => {
-    // Kiểm tra trình duyệt hỗ trợ TTS
-    if (!('speechSynthesis' in window)) {
-      alert('Trình duyệt chưa hỗ trợ đọc văn bản.');
+  // Gọi Google TTS qua Backend và phát MP3
+  const handleSpeak = async (message) => {
+    if (speakingId === message.id) {
+      stopAudio();
       return;
     }
 
-    // Dừng giọng đọc trước đó
-    window.speechSynthesis.cancel();
+    stopAudio();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setSpeakingId(message.id);
 
-    // Lấy danh sách giọng đọc
-    const voices = window.speechSynthesis.getVoices();
+    try {
+      const response = await fetch(TTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: message.content }),
+        signal: controller.signal,
+      });
 
-    // Ưu tiên giọng nữ miền Nam
-    const selectedVoice = voices.find(
-      (voice) =>
-        voice.name.includes('Vietnamese (Southern)') &&
-        voice.name.includes('female2')
-    );
-
-    // Nếu không có giọng female2, tìm giọng miền Nam khác
-    const southernVoice = voices.find(
-      (voice) =>
-        voice.name.includes('Vietnamese (Southern)')
-    );
-
-    // Nếu không có giọng miền Nam, tìm giọng tiếng Việt
-    const vietnameseVoice = voices.find(
-      (voice) =>
-        voice.lang?.toLowerCase().startsWith('vi')
-    );
-
-    // Tạo nội dung cần đọc
-    const utterance = new SpeechSynthesisUtterance(text);
-
-    // Chọn giọng đọc phù hợp
-    utterance.voice =
-      selectedVoice ||
-      southernVoice ||
-      vietnameseVoice ||
-      null;
-
-    // Ngôn ngữ tiếng Việt
-    utterance.lang = 'vi-VN';
-
-    // Tốc độ đọc chậm, dễ nghe
-    utterance.rate = 0.9;
-
-    // Cao độ giọng nói
-    utterance.pitch = 1;
-
-    // Âm lượng tối đa
-    utterance.volume = 1;
-
-    // Theo dõi khi bắt đầu đọc
-    utterance.onstart = () => {
-      console.log('Đã bắt đầu đọc câu trả lời.');
-    };
-
-    // Theo dõi khi đọc xong
-    utterance.onend = () => {
-      console.log('Đã đọc xong câu trả lời.');
-    };
-
-    // Xử lý lỗi phát giọng nói
-    utterance.onerror = (event) => {
-      if (event.error !== 'canceled') {
-        console.error('Lỗi phát giọng nói:', event.error);
+      if (!response.ok) {
+        throw new Error(`API TTS trả về HTTP ${response.status}`);
       }
-    };
 
-    // Bắt đầu đọc
-    window.speechSynthesis.speak(utterance);
+      const audioBlob = await response.blob();
+      if (controller.signal.aborted) return;
+      if (!audioBlob.size) throw new Error('File âm thanh rỗng.');
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioUrlRef.current = audioUrl;
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+
+      audio.onended = () => {
+        if (audioRef.current === audio) stopAudio();
+      };
+      audio.onerror = () => {
+        if (audioRef.current === audio) {
+          console.error('Không thể phát file MP3.');
+          stopAudio();
+          alert('Không thể phát âm thanh.');
+        }
+      };
+
+      await audio.play();
+    } catch (error) {
+      if (error.name !== 'AbortError' && !controller.signal.aborted) {
+        console.error('Lỗi Google TTS:', error);
+        alert('Không thể phát giọng nói. Hãy kiểm tra Backend và thử lại.');
+      }
+      if (requestRef.current === controller) stopAudio();
+    } finally {
+      if (requestRef.current === controller) requestRef.current = null;
+    }
   };
 
   return (
@@ -371,11 +381,13 @@ function ChatPage() {
                         type="button"
                         className="chat-speak-button"
                         onClick={() =>
-                          handleSpeak(message.content)
+                          handleSpeak(message)
                         }
                       >
                         <Volume2 size={15} />
-                        Nghe câu trả lời
+                        {speakingId === message.id
+                          ? 'Dừng đọc'
+                          : 'Nghe câu trả lời'}
                       </button>
 
                     )}
