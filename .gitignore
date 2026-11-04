@@ -53,3 +53,21 @@ __pycache__/
 # Docker overrides
 compose.override.yaml
 docker-compose.override.yml
+# Python virtual environments
+.venv/
+.venv-tts/
+venv/
+
+# Local environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Temporary audio test files
+test-*.mp3
+backend/test-*.mp3
+
+# Backend backup files
+backend/server.backup.js
+backend/server.before-google-tts.js
+
