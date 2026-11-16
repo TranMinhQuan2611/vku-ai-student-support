@@ -5,6 +5,14 @@ const { Pool } = require('pg');
 const path = require('path');
 
 // ==========================================
+// ADMIN AUTHENTICATION
+// ==========================================
+
+const session = require('express-session');
+const PgSession = require('connect-pg-simple')(session);
+const bcrypt = require('bcrypt');
+
+// ==========================================
 // ĐỌC FILE .ENV TỪ THƯ MỤC GỐC DỰ ÁN
 // ==========================================
 
@@ -42,6 +50,46 @@ const pool = new Pool({
 
   connectionTimeoutMillis: 5000
 });
+// ==========================================
+// CẤU HÌNH SESSION CHO ADMIN
+// ==========================================
+
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 64) {
+  throw new Error(
+    'SESSION_SECRET phải được cấu hình và có ít nhất 64 ký tự.'
+  );
+}
+
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
+app.use(
+  session({
+    store: new PgSession({
+      pool,
+      tableName: 'session',
+      createTableIfMissing: false
+    }),
+
+    name: 'vku_admin_sid',
+
+    secret: process.env.SESSION_SECRET,
+
+    resave: false,
+
+    saveUninitialized: false,
+
+    cookie: {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      maxAge: 1000 * 60 * 60 * 2
+    }
+  })
+);
 
 // ==========================================
 // API 1: KIỂM TRA TRẠNG THÁI BACKEND
@@ -587,8 +635,9 @@ app.put('/api/faqs/:id', async (req, res) => {
     });
   }
 });
+
 // ==========================================
-// API: XÓA CÂU HỎI FAQ
+// API 9: XÓA CÂU HỎI FAQ
 // ==========================================
 
 app.delete('/api/faqs/:id', async (req, res) => {
@@ -637,6 +686,7 @@ app.delete('/api/faqs/:id', async (req, res) => {
     });
   }
 });
+
 // ==========================================
 // API 10: XÁC MINH / HỦY XÁC MINH FAQ
 // ==========================================
@@ -701,8 +751,9 @@ app.patch('/api/faqs/:id/verify', async (req, res) => {
     });
   }
 });
+
 // ==========================================
-// API GOOGLE TEXT TO SPEECH
+// API 11: GOOGLE TEXT TO SPEECH
 // ==========================================
 
 app.post('/api/tts', async (req, res) => {
@@ -794,6 +845,7 @@ app.post('/api/tts', async (req, res) => {
     });
   }
 });
+
 // ==========================================
 // KHỞI ĐỘNG BACKEND
 // ==========================================
