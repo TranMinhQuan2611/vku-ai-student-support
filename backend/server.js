@@ -3,17 +3,14 @@ const cors = require('cors');
 const axios = require('axios');
 const { Pool } = require('pg');
 const path = require('path');
-
-// ==========================================
-// ADMIN AUTHENTICATION
-// ==========================================
+const { spawn } = require('child_process');
 
 const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const bcrypt = require('bcrypt');
 
 // ==========================================
-// ĐỌC FILE .ENV TỪ THƯ MỤC GỐC DỰ ÁN
+// ĐỌC BIẾN MÔI TRƯỜNG
 // ==========================================
 
 require('dotenv').config({
@@ -30,33 +27,32 @@ app.use(cors());
 app.use(express.json({ limit: '16kb' }));
 
 // ==========================================
-// CẤU HÌNH POSTGRESQL
+// KẾT NỐI POSTGRESQL
 // ==========================================
 
 const pool = new Pool({
   host: process.env.DB_HOST || '127.0.0.1',
-
   port: Number(process.env.DB_PORT) || 5432,
-
   user: process.env.DB_USER || 'vku_user',
-
   password:
     process.env.DB_PASSWORD ||
     process.env.POSTGRES_PASSWORD,
-
   database:
     process.env.DB_NAME ||
     'vku_student_support',
-
   connectionTimeoutMillis: 5000
 });
+
 // ==========================================
-// CẤU HÌNH SESSION CHO ADMIN
+// CẤU HÌNH SESSION ADMIN
 // ==========================================
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-if (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 64) {
+if (
+  !process.env.SESSION_SECRET ||
+  process.env.SESSION_SECRET.length < 64
+) {
   throw new Error(
     'SESSION_SECRET phải được cấu hình và có ít nhất 64 ký tự.'
   );
@@ -75,11 +71,9 @@ app.use(
     }),
 
     name: 'vku_admin_sid',
-
     secret: process.env.SESSION_SECRET,
 
     resave: false,
-
     saveUninitialized: false,
 
     cookie: {
@@ -92,11 +86,187 @@ app.use(
 );
 
 // ==========================================
-// API 1: KIỂM TRA TRẠNG THÁI BACKEND
+// MIDDLEWARE KIỂM TRA QUYỀN ADMIN
+// ==========================================
+
+function requireAdmin(req, res, next) {
+  if (
+    !req.session?.admin?.id ||
+    req.session.admin.role !== 'admin'
+  ) {
+    return res.status(401).json({
+      success: false,
+      message: 'Bạn cần đăng nhập Admin.'
+    });
+  }
+
+  next();
+}
+
+// ==========================================
+// API ĐĂNG NHẬP ADMIN
+// ==========================================
+
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+
+    if (
+      typeof username !== 'string' ||
+      typeof password !== 'string' ||
+      !username.trim() ||
+      !password
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập tên đăng nhập và mật khẩu.'
+      });
+    }
+
+    const result = await pool.query(
+      `
+      SELECT
+        id,
+        username,
+        password_hash,
+        role,
+        is_active
+      FROM admin_users
+      WHERE username = $1
+      LIMIT 1
+      `,
+      [username.trim()]
+    );
+
+    const admin = result.rows[0];
+
+    if (
+      !admin ||
+      !admin.is_active ||
+      admin.role !== 'admin'
+    ) {
+      return res.status(401).json({
+        success: false,
+        message: 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+      });
+    }
+
+    const passwordValid = await bcrypt.compare(
+      password,
+      admin.password_hash
+    );
+
+    if (!passwordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Tên đăng nhập hoặc mật khẩu không chính xác.'
+      });
+    }
+
+    req.session.regenerate((error) => {
+      if (error) {
+        console.error('Lỗi tạo session:', error.message);
+
+        return res.status(500).json({
+          success: false,
+          message: 'Không thể tạo phiên đăng nhập.'
+        });
+      }
+
+      req.session.admin = {
+        id: admin.id,
+        username: admin.username,
+        role: admin.role
+      };
+
+      req.session.save((saveError) => {
+        if (saveError) {
+          console.error(
+            'Lỗi lưu session:',
+            saveError.message
+          );
+
+          return res.status(500).json({
+            success: false,
+            message: 'Không thể lưu phiên đăng nhập.'
+          });
+        }
+
+        return res.json({
+          success: true,
+          message: 'Đăng nhập Admin thành công.',
+          admin: req.session.admin
+        });
+      });
+    });
+
+  } catch (error) {
+    console.error(
+      'Lỗi đăng nhập Admin:',
+      error.message
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể đăng nhập. Vui lòng thử lại.'
+    });
+  }
+});
+
+// ==========================================
+// API KIỂM TRA PHIÊN ĐĂNG NHẬP
+// ==========================================
+
+app.get('/api/admin/me', requireAdmin, (req, res) => {
+  return res.json({
+    success: true,
+    authenticated: true,
+    admin: req.session.admin
+  });
+});
+
+// ==========================================
+// API ĐĂNG XUẤT ADMIN
+// ==========================================
+
+app.post('/api/admin/logout', (req, res) => {
+  if (!req.session) {
+    return res.json({
+      success: true,
+      message: 'Đã đăng xuất.'
+    });
+  }
+
+  req.session.destroy((error) => {
+    if (error) {
+      console.error('Lỗi đăng xuất:', error.message);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể đăng xuất.'
+      });
+    }
+
+    res.clearCookie('vku_admin_sid', {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/'
+    });
+
+    return res.json({
+      success: true,
+      message: 'Đăng xuất thành công.'
+    });
+  });
+});
+
+// ==========================================
+// API 1: KIỂM TRA BACKEND
 // ==========================================
 
 app.get('/api/health', (req, res) => {
-  res.json({
+  return res.json({
     success: true,
     message: 'VKU AI Student Support Backend đang hoạt động',
     timestamp: new Date().toISOString()
@@ -105,14 +275,13 @@ app.get('/api/health', (req, res) => {
 
 // ==========================================
 // API 2: GỬI CÂU HỎI ĐẾN N8N
-// VÀ TỰ ĐỘNG LƯU LỊCH SỬ
+// VÀ LƯU LỊCH SỬ
 // ==========================================
 
 app.post('/api/ask', async (req, res) => {
   try {
     const question = req.body?.question;
 
-    // Kiểm tra câu hỏi hợp lệ
     if (
       typeof question !== 'string' ||
       !question.trim()
@@ -123,7 +292,6 @@ app.post('/api/ask', async (req, res) => {
       });
     }
 
-    // Giới hạn độ dài câu hỏi
     const cleanQuestion = question.trim();
 
     if (cleanQuestion.length > 1000) {
@@ -133,12 +301,10 @@ app.post('/api/ask', async (req, res) => {
       });
     }
 
-    // Địa chỉ Webhook n8n
     const webhookUrl =
       process.env.N8N_WEBHOOK_URL ||
       'http://localhost:5678/webhook/student-question';
 
-    // Gửi câu hỏi đến n8n
     const response = await axios.post(
       webhookUrl,
       {
@@ -152,10 +318,8 @@ app.post('/api/ask', async (req, res) => {
       }
     );
 
-    // Dữ liệu phản hồi từ n8n
     const aiResult = response.data;
 
-    // Kiểm tra phản hồi hợp lệ
     if (
       !aiResult ||
       typeof aiResult !== 'object' ||
@@ -169,10 +333,6 @@ app.post('/api/ask', async (req, res) => {
         message: 'Hệ thống AI trả về dữ liệu không hợp lệ.'
       });
     }
-
-    // ======================================
-    // LƯU LỊCH SỬ VÀO POSTGRESQL
-    // ======================================
 
     try {
       const saveResult = await pool.query(
@@ -203,7 +363,6 @@ app.post('/api/ask', async (req, res) => {
         ]
       );
 
-      // Trả kết quả AI kèm ID lịch sử
       return res.json({
         ...aiResult,
         history_id: saveResult.rows[0].id,
@@ -216,8 +375,6 @@ app.post('/api/ask', async (req, res) => {
         dbError.message
       );
 
-      // AI vẫn trả lời nếu PostgreSQL gặp lỗi.
-      // Không báo đã lưu thành công.
       return res.json({
         ...aiResult,
         history_id: null,
@@ -404,15 +561,12 @@ app.delete('/api/history', async (req, res) => {
 
 // ==========================================
 // API 7: THÊM CÂU HỎI FAQ
+// CHỈ ADMIN
 // ==========================================
 
-app.post('/api/faqs', async (req, res) => {
+app.post('/api/faqs', requireAdmin, async (req, res) => {
   try {
     const { category, question, answer } = req.body || {};
-
-    // ======================================
-    // KIỂM TRA DỮ LIỆU ĐẦU VÀO
-    // ======================================
 
     if (
       typeof category !== 'string' ||
@@ -429,17 +583,9 @@ app.post('/api/faqs', async (req, res) => {
       });
     }
 
-    // ======================================
-    // CHUẨN HÓA DỮ LIỆU
-    // ======================================
-
     const cleanCategory = category.trim();
     const cleanQuestion = question.trim();
     const cleanAnswer = answer.trim();
-
-    // ======================================
-    // KIỂM TRA ĐỘ DÀI
-    // ======================================
 
     if (cleanCategory.length > 100) {
       return res.status(400).json({
@@ -464,10 +610,6 @@ app.post('/api/faqs', async (req, res) => {
           'Câu trả lời không được vượt quá 10000 ký tự.'
       });
     }
-
-    // ======================================
-    // LƯU FAQ VÀO POSTGRESQL
-    // ======================================
 
     const result = await pool.query(
       `
@@ -502,10 +644,6 @@ app.post('/api/faqs', async (req, res) => {
       ]
     );
 
-    // ======================================
-    // TRẢ KẾT QUẢ THÀNH CÔNG
-    // ======================================
-
     return res.status(201).json({
       success: true,
       message: 'Thêm câu hỏi FAQ thành công.',
@@ -528,11 +666,11 @@ app.post('/api/faqs', async (req, res) => {
 
 // ==========================================
 // API 8: CẬP NHẬT CÂU HỎI FAQ
+// CHỈ ADMIN
 // ==========================================
 
-app.put('/api/faqs/:id', async (req, res) => {
+app.put('/api/faqs/:id', requireAdmin, async (req, res) => {
   try {
-    // Lấy ID câu hỏi
     const id = Number(req.params.id);
 
     if (!Number.isSafeInteger(id) || id <= 0) {
@@ -542,7 +680,6 @@ app.put('/api/faqs/:id', async (req, res) => {
       });
     }
 
-    // Lấy dữ liệu từ frontend
     const {
       category,
       question,
@@ -550,7 +687,6 @@ app.put('/api/faqs/:id', async (req, res) => {
       source_url
     } = req.body || {};
 
-    // Kiểm tra dữ liệu bắt buộc
     if (
       typeof category !== 'string' ||
       !category.trim() ||
@@ -561,11 +697,11 @@ app.put('/api/faqs/:id', async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: 'Vui lòng nhập đầy đủ danh mục, câu hỏi và câu trả lời.'
+        message:
+          'Vui lòng nhập đầy đủ danh mục, câu hỏi và câu trả lời.'
       });
     }
 
-    // Kiểm tra nguồn tham khảo
     if (
       source_url !== undefined &&
       source_url !== null &&
@@ -580,12 +716,12 @@ app.put('/api/faqs/:id', async (req, res) => {
     const cleanCategory = category.trim();
     const cleanQuestion = question.trim();
     const cleanAnswer = answer.trim();
+
     const cleanSourceUrl =
       typeof source_url === 'string'
         ? source_url.trim() || null
         : null;
 
-    // Cập nhật dữ liệu PostgreSQL
     const result = await pool.query(
       `
       UPDATE faqs
@@ -608,7 +744,6 @@ app.put('/api/faqs/:id', async (req, res) => {
       ]
     );
 
-    // Không tìm thấy câu hỏi
     if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
@@ -616,7 +751,6 @@ app.put('/api/faqs/:id', async (req, res) => {
       });
     }
 
-    // Trả kết quả thành công
     return res.json({
       success: true,
       message: 'Cập nhật câu hỏi FAQ thành công.',
@@ -631,20 +765,21 @@ app.put('/api/faqs/:id', async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: 'Không thể cập nhật câu hỏi FAQ. Vui lòng thử lại.'
+      message:
+        'Không thể cập nhật câu hỏi FAQ. Vui lòng thử lại.'
     });
   }
 });
 
 // ==========================================
 // API 9: XÓA CÂU HỎI FAQ
+// CHỈ ADMIN
 // ==========================================
 
-app.delete('/api/faqs/:id', async (req, res) => {
+app.delete('/api/faqs/:id', requireAdmin, async (req, res) => {
   try {
     const id = Number(req.params.id);
 
-    // Kiểm tra ID
     if (!Number.isSafeInteger(id) || id <= 0) {
       return res.status(400).json({
         success: false,
@@ -652,7 +787,6 @@ app.delete('/api/faqs/:id', async (req, res) => {
       });
     }
 
-    // Xóa FAQ khỏi PostgreSQL
     const result = await pool.query(
       `
       DELETE FROM faqs
@@ -662,7 +796,6 @@ app.delete('/api/faqs/:id', async (req, res) => {
       [id]
     );
 
-    // Không tìm thấy FAQ
     if (result.rowCount === 0) {
       return res.status(404).json({
         success: false,
@@ -670,7 +803,6 @@ app.delete('/api/faqs/:id', async (req, res) => {
       });
     }
 
-    // Xóa thành công
     return res.json({
       success: true,
       message: 'Đã xóa câu hỏi FAQ thành công.',
@@ -678,7 +810,10 @@ app.delete('/api/faqs/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Lỗi xóa FAQ:', error.message);
+    console.error(
+      'Lỗi xóa FAQ:',
+      error.message
+    );
 
     return res.status(500).json({
       success: false,
@@ -689,68 +824,73 @@ app.delete('/api/faqs/:id', async (req, res) => {
 
 // ==========================================
 // API 10: XÁC MINH / HỦY XÁC MINH FAQ
+// CHỈ ADMIN
 // ==========================================
 
-app.patch('/api/faqs/:id/verify', async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { verified } = req.body || {};
+app.patch(
+  '/api/faqs/:id/verify',
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { verified } = req.body || {};
 
-    // Kiểm tra ID
-    if (!Number.isSafeInteger(id) || id <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'ID câu hỏi FAQ không hợp lệ.'
-      });
-    }
+      if (!Number.isSafeInteger(id) || id <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID câu hỏi FAQ không hợp lệ.'
+        });
+      }
 
-    // Kiểm tra trạng thái xác minh
-    if (typeof verified !== 'boolean') {
-      return res.status(400).json({
-        success: false,
-        message: 'Trạng thái xác minh phải là true hoặc false.'
-      });
-    }
+      if (typeof verified !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message:
+            'Trạng thái xác minh phải là true hoặc false.'
+        });
+      }
 
-    // Cập nhật trạng thái trong PostgreSQL
-    const result = await pool.query(
-      `
+      const result = await pool.query(
+        `
         UPDATE faqs
         SET
           verified = $1,
           updated_at = NOW()
         WHERE id = $2
         RETURNING *
-      `,
-      [verified, id]
-    );
+        `,
+        [verified, id]
+      );
 
-    // Không tìm thấy câu hỏi
-    if (result.rowCount === 0) {
-      return res.status(404).json({
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy câu hỏi FAQ.'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: verified
+          ? 'Xác minh câu hỏi FAQ thành công.'
+          : 'Đã hủy xác minh câu hỏi FAQ.',
+        faq: result.rows[0]
+      });
+
+    } catch (error) {
+      console.error(
+        'Lỗi xác minh FAQ:',
+        error.message
+      );
+
+      return res.status(500).json({
         success: false,
-        message: 'Không tìm thấy câu hỏi FAQ.'
+        message:
+          'Không thể cập nhật trạng thái xác minh FAQ.'
       });
     }
-
-    // Trả kết quả
-    return res.json({
-      success: true,
-      message: verified
-        ? 'Xác minh câu hỏi FAQ thành công.'
-        : 'Đã hủy xác minh câu hỏi FAQ.',
-      faq: result.rows[0]
-    });
-
-  } catch (error) {
-    console.error('Lỗi xác minh FAQ:', error.message);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Không thể cập nhật trạng thái xác minh FAQ.'
-    });
   }
-});
+);
 
 // ==========================================
 // API 11: GOOGLE TEXT TO SPEECH
@@ -758,28 +898,35 @@ app.patch('/api/faqs/:id/verify', async (req, res) => {
 
 app.post('/api/tts', async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text } = req.body || {};
 
-    // Kiểm tra nội dung
-    if (typeof text !== 'string' || !text.trim()) {
+    if (
+      typeof text !== 'string' ||
+      !text.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Vui lòng cung cấp văn bản cần đọc.'
       });
     }
 
-    // Giới hạn độ dài văn bản
     if (text.length > 1000) {
       return res.status(400).json({
         success: false,
-        message: 'Văn bản không được vượt quá 1000 ký tự.'
+        message:
+          'Văn bản không được vượt quá 1000 ký tự.'
       });
     }
 
-    const { spawn } = require('child_process');
+    const pythonPath = path.join(
+      __dirname,
+      '../.venv-tts/bin/python'
+    );
 
-    const pythonPath = path.join(__dirname, '../.venv-tts/bin/python');
-    const scriptPath = path.join(__dirname, 'google_tts_service.py');
+    const scriptPath = path.join(
+      __dirname,
+      'google_tts_service.py'
+    );
 
     const python = spawn(pythonPath, [
       scriptPath,
@@ -799,12 +946,16 @@ app.post('/api/tts', async (req, res) => {
     });
 
     python.on('error', (error) => {
-      console.error('Không thể chạy Python TTS:', error.message);
+      console.error(
+        'Không thể chạy Python TTS:',
+        error.message
+      );
 
       if (!res.headersSent) {
-        res.status(500).json({
+        return res.status(500).json({
           success: false,
-          message: 'Không thể khởi động dịch vụ giọng nói.'
+          message:
+            'Không thể khởi động dịch vụ giọng nói.'
         });
       }
     });
@@ -813,7 +964,10 @@ app.post('/api/tts', async (req, res) => {
       if (res.headersSent) return;
 
       if (code !== 0) {
-        console.error('Google TTS lỗi:', errorOutput);
+        console.error(
+          'Google TTS lỗi:',
+          errorOutput
+        );
 
         return res.status(500).json({
           success: false,
@@ -826,22 +980,34 @@ app.post('/api/tts', async (req, res) => {
       if (audioBuffer.length === 0) {
         return res.status(500).json({
           success: false,
-          message: 'Không nhận được dữ liệu âm thanh.'
+          message:
+            'Không nhận được dữ liệu âm thanh.'
         });
       }
 
-      res.setHeader('Content-Type', 'audio/mpeg');
-      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader(
+        'Content-Type',
+        'audio/mpeg'
+      );
+
+      res.setHeader(
+        'Cache-Control',
+        'no-store'
+      );
 
       return res.send(audioBuffer);
     });
 
   } catch (error) {
-    console.error('Lỗi API TTS:', error.message);
+    console.error(
+      'Lỗi API TTS:',
+      error.message
+    );
 
     return res.status(500).json({
       success: false,
-      message: 'Đã xảy ra lỗi khi tạo giọng nói.'
+      message:
+        'Đã xảy ra lỗi khi tạo giọng nói.'
     });
   }
 });
