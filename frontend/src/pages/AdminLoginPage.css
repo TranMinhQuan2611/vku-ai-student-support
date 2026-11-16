@@ -1,0 +1,260 @@
+/* ==========================================
+   VKU AI - ADMIN LOGIN
+========================================== */
+
+.admin-login-page {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+
+  background:
+    radial-gradient(
+      circle at 15% 20%,
+      rgba(59, 130, 246, 0.12),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 85% 80%,
+      rgba(14, 165, 233, 0.1),
+      transparent 35%
+    ),
+    #f5f8ff;
+}
+
+.admin-login-card {
+  width: 100%;
+  max-width: 460px;
+  padding: 44px 40px;
+
+  background: #ffffff;
+  border: 1px solid #e5edf8;
+  border-radius: 24px;
+
+  box-shadow:
+    0 20px 60px rgba(30, 64, 175, 0.08),
+    0 4px 16px rgba(15, 23, 42, 0.03);
+}
+
+.admin-login-logo {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+
+  border-radius: 19px;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.2);
+}
+
+.admin-login-heading {
+  text-align: center;
+  margin-bottom: 34px;
+}
+
+.admin-login-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  padding: 7px 12px;
+  margin-bottom: 18px;
+
+  color: #2563eb;
+  background: #eff6ff;
+
+  border: 1px solid #dbeafe;
+  border-radius: 100px;
+
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.8px;
+}
+
+.admin-login-heading h1 {
+  margin: 0 0 10px;
+
+  color: #142d56;
+  font-size: 27px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+}
+
+.admin-login-heading p {
+  margin: 0;
+
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.admin-login-field {
+  margin-bottom: 22px;
+}
+
+.admin-login-field label {
+  display: block;
+  margin-bottom: 9px;
+
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-login-input {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  width: 100%;
+  height: 52px;
+  padding: 0 15px;
+
+  color: #94a3b8;
+  background: #f8fafc;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+
+  transition: 0.2s ease;
+}
+
+.admin-login-input:focus-within {
+  background: #ffffff;
+  border-color: #3b82f6;
+
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.admin-login-input input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+
+  border: none;
+  outline: none;
+  background: transparent;
+
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.admin-login-input input::placeholder {
+  color: #94a3b8;
+}
+
+.admin-login-eye {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 4px;
+  border: none;
+  background: transparent;
+
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.admin-login-eye:hover {
+  color: #2563eb;
+}
+
+.admin-login-error {
+  margin-bottom: 18px;
+  padding: 12px 14px;
+
+  color: #b91c1c;
+  background: #fef2f2;
+
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  width: 100%;
+  height: 52px;
+  margin-top: 8px;
+
+  border: none;
+  border-radius: 12px;
+
+  color: #ffffff;
+  background: linear-gradient(135deg, #2563eb, #0ea5e9);
+
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 750;
+
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.admin-login-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+}
+
+.admin-login-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.admin-login-spinner {
+  animation: admin-login-spin 1s linear infinite;
+}
+
+@keyframes admin-login-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.admin-login-footer {
+  margin-top: 32px;
+  padding-top: 24px;
+
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+}
+
+.admin-login-footer p {
+  margin: 0 0 4px;
+
+  color: #334155;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.admin-login-footer span {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+@media (max-width: 480px) {
+  .admin-login-card {
+    padding: 32px 24px;
+    border-radius: 18px;
+  }
+
+  .admin-login-heading h1 {
+    font-size: 23px;
+  }
+}

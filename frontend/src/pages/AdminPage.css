@@ -857,3 +857,55 @@
     grid-template-columns: 1fr;
   }
 }
+/* ========================================
+   ADMIN HEADER ACTIONS
+======================================== */
+
+.admin-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+
+  padding: 12px 18px;
+
+  background: #ffffff;
+  color: #dc2626;
+
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-logout-btn:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+  transform: translateY(-1px);
+}
+
+.admin-logout-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .admin-header-actions {
+    gap: 10px;
+  }
+
+  .admin-logout-btn {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+}

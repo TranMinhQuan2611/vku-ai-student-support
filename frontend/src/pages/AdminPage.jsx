@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
+import { useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
 import {
   LayoutDashboard,
   BookOpen,
@@ -36,6 +37,31 @@ const EMPTY_FAQ = {
 };
 
 function AdminPage() {
+    const navigate = useNavigate();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+
+    try {
+      const response = await fetch('/api/admin/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Không thể đăng xuất. Vui lòng thử lại.');
+      }
+
+      navigate('/admin/login', { replace: true });
+    } catch (error) {
+      alert(error.message || 'Đăng xuất thất bại.');
+    } finally {
+      setLoggingOut(false);
+    }
+  };
   const [faqs, setFaqs] = useState([]);
   const [history, setHistory] = useState([]);
 
@@ -548,8 +574,23 @@ function AdminPage() {
             </p>
           </div>
 
-          <div className="admin-hero-icon">
-            <LayoutDashboard size={34} />
+                    <div className="admin-header-actions">
+            <button
+              type="button"
+              className="admin-logout-btn"
+              onClick={handleLogout}
+              disabled={loggingOut}
+            >
+              <LogOut size={18} />
+
+              <span>
+                {loggingOut ? 'Đang đăng xuất...' : 'Đăng xuất'}
+              </span>
+            </button>
+
+            <div className="admin-hero-icon">
+              <LayoutDashboard size={34} />
+            </div>
           </div>
         </header>
 
