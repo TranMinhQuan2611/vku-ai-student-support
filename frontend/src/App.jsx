@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 
 // ==========================================
 // IMPORT COMPONENTS
@@ -13,7 +13,6 @@ import Sidebar from './components/Sidebar';
 import ChatPage from './pages/ChatPage';
 import FAQPage from './pages/FAQPage';
 import HistoryPage from './pages/HistoryPage';
-import AdminPage from './pages/AdminPage';
 
 // ==========================================
 // IMPORT CSS
@@ -22,60 +21,49 @@ import AdminPage from './pages/AdminPage';
 import './App.css';
 
 // ==========================================
-// MAIN APPLICATION
+// STUDENT LAYOUT
+// ==========================================
+
+function StudentLayout() {
+  return (
+    <div className="app-layout">
+      <Sidebar />
+
+      <main className="app-main">
+        <Outlet />
+      </main>
+    </div>
+  );
+}
+
+// ==========================================
+// MAIN APPLICATION ROUTES
 // ==========================================
 
 function App() {
-  const [activePage, setActivePage] = useState('chat');
-
-  // ========================================
-  // HIỂN THỊ TRANG THEO MENU
-  // ========================================
-
-  const renderPage = () => {
-    switch (activePage) {
-
-      // TRỢ LÝ AI
-      case 'chat':
-        return <ChatPage />;
-
-      // CÂU HỎI THƯỜNG GẶP
-      case 'faq':
-        return <FAQPage />;
-
-      // LỊCH SỬ HỘI THOẠI
-      case 'history':
-        return <HistoryPage />;
-
-      // QUẢN TRỊ HỆ THỐNG
-      case 'admin':
-        return <AdminPage />;
-
-      // MẶC ĐỊNH
-      default:
-        return <ChatPage />;
-    }
-  };
-
-  // ========================================
-  // GIAO DIỆN CHÍNH
-  // ========================================
-
   return (
-    <div className="app-layout">
+    <Routes>
+      {/* STUDENT PORTAL */}
+      <Route element={<StudentLayout />}>
+        <Route path="/" element={<ChatPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/history" element={<HistoryPage />} />
+      </Route>
 
-      {/* THANH ĐIỀU HƯỚNG */}
-      <Sidebar
-        activeItem={activePage}
-        onNavigate={setActivePage}
+      {/* ADMIN PORTAL - CHƯA TRIỂN KHAI */}
+      <Route
+        path="/admin/*"
+        element={
+          <div style={{ padding: '40px', textAlign: 'center' }}>
+            <h2>VKU AI - Admin Portal</h2>
+            <p>Khu vực quản trị đang được xây dựng.</p>
+          </div>
+        }
       />
 
-      {/* NỘI DUNG TRANG */}
-      <main className="app-main">
-        {renderPage()}
-      </main>
-
-    </div>
+      {/* UNKNOWN ROUTES */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 

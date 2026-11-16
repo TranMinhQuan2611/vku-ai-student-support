@@ -3,38 +3,45 @@ import {
   MessageCircle,
   BookOpen,
   History,
-  Settings,
   Sparkles,
   ChevronRight,
   CircleHelp,
 } from 'lucide-react';
 
+import { NavLink } from 'react-router-dom';
+
 import './Sidebar.css';
+
+// ==========================================
+// STUDENT NAVIGATION
+// ==========================================
 
 const menuItems = [
   {
     id: 'chat',
     label: 'Trợ lý AI',
     icon: MessageCircle,
+    path: '/',
   },
   {
     id: 'faq',
     label: 'Câu hỏi thường gặp',
     icon: BookOpen,
+    path: '/faq',
   },
   {
     id: 'history',
     label: 'Lịch sử hội thoại',
     icon: History,
-  },
-  {
-    id: 'admin',
-    label: 'Quản trị hệ thống',
-    icon: Settings,
+    path: '/history',
   },
 ];
 
-function Sidebar({ activeItem, onNavigate }) {
+// ==========================================
+// SIDEBAR COMPONENT
+// ==========================================
+
+function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-top">
@@ -57,28 +64,31 @@ function Sidebar({ activeItem, onNavigate }) {
           <nav className="sidebar-nav">
             {menuItems.map((item) => {
               const Icon = item.icon;
-              const isActive = activeItem === item.id;
 
               return (
-                <button
+                <NavLink
                   key={item.id}
-                  type="button"
-                  className={`sidebar-link ${
-                    isActive ? 'active' : ''
-                  }`}
-                  onClick={() => onNavigate(item.id)}
+                  to={item.path}
+                  end={item.path === '/'}
+                  className={({ isActive }) =>
+                    `sidebar-link ${isActive ? 'active' : ''}`
+                  }
                 >
-                  <Icon size={19} strokeWidth={2} />
+                  {({ isActive }) => (
+                    <>
+                      <Icon size={19} strokeWidth={2} />
 
-                  <span>{item.label}</span>
+                      <span>{item.label}</span>
 
-                  {isActive && (
-                    <ChevronRight
-                      className="sidebar-chevron"
-                      size={16}
-                    />
+                      {isActive && (
+                        <ChevronRight
+                          className="sidebar-chevron"
+                          size={16}
+                        />
+                      )}
+                    </>
                   )}
-                </button>
+                </NavLink>
               );
             })}
           </nav>
