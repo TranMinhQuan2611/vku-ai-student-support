@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
 import {
@@ -23,6 +23,7 @@ import {
   Save,
   Pencil,
   Trash2,
+  ClipboardList,
 } from 'lucide-react';
 
 import './AdminPage.css';
@@ -64,6 +65,15 @@ function AdminPage() {
   };
   const [faqs, setFaqs] = useState([]);
   const [history, setHistory] = useState([]);
+
+  // Yêu cầu hỗ trợ sinh viên (API yêu cầu phiên đăng nhập Admin).
+  const [supportRequests, setSupportRequests] = useState([]);
+  const [supportLoading, setSupportLoading] = useState(true);
+  const [supportError, setSupportError] = useState('');
+  const [supportSearch, setSupportSearch] = useState('');
+  const [supportStatus, setSupportStatus] = useState('all');
+  const [expandedSupportId, setExpandedSupportId] = useState(null);
+
 
   const [backendOnline, setBackendOnline] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -155,6 +165,54 @@ function AdminPage() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  const loadSupportRequests = useCallback(async () => {
+    setSupportLoading(true);
+    setSupportError('');
+    try {
+      const response = await fetch('/api/admin/support-requests', {
+        method: 'GET',
+        credentials: 'include',
+      });
+      if (response.status === 401) {
+        throw new Error('Phiên Admin đã hết hạn. Vui lòng đăng nhập lại.');
+      }
+      if (!response.ok) {
+        throw new Error(`Không thể tải yêu cầu hỗ trợ (HTTP ${response.status}).`);
+      }
+      const data = await response.json();
+      if (data.success !== true || !Array.isArray(data.requests)) {
+        throw new Error('Dữ liệu yêu cầu hỗ trợ không hợp lệ.');
+      }
+      setSupportRequests(data.requests);
+    } catch (err) {
+      setSupportError(err.message || 'Không thể tải yêu cầu hỗ trợ.');
+    } finally {
+      setSupportLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSupportRequests();
+  }, [loadSupportRequests]);
+
+  const supportStatuses = useMemo(() =>
+    [...new Set(supportRequests.map((item) => String(item.status ?? 'Chưa có trạng thái')))],
+    [supportRequests]
+  );
+
+  const filteredSupportRequests = useMemo(() => {
+    const keyword = supportSearch.trim().toLocaleLowerCase('vi');
+    return supportRequests.filter((item) => {
+      const status = String(item.status ?? 'Chưa có trạng thái');
+      const matchesStatus = supportStatus === 'all' || supportStatus === status;
+      const searchable = [item.id, item.name, item.full_name, item.student_name,
+        item.email, item.subject, item.title, item.message, item.content,
+        item.question, item.status].filter((value) => value != null)
+        .join(' ').toLocaleLowerCase('vi');
+      return matchesStatus && (!keyword || searchable.includes(keyword));
+    });
+  }, [supportRequests, supportSearch, supportStatus]);
 
   // ==========================================
   // THỐNG KÊ
@@ -1346,6 +1404,97 @@ function AdminPage() {
             </div>
           )}
 
+        </section>
+
+        {/* QUẢN LÝ YÊU CẦU HỖ TRỢ SINH VIÊN */}
+        <section className="admin-faq-section" style={{ marginTop: 24 }}>
+          <div className="admin-section-heading">
+            <div>
+              <h2><ClipboardList size={21} /> Yêu cầu hỗ trợ sinh viên</h2>
+              <p>Theo dõi các yêu cầu được gửi đến hệ thống.</p>
+            </div>
+            <div className="admin-faq-heading-actions">
+              <span className="admin-count-badge">{supportRequests.length} yêu cầu</span>
+              <button type="button" className="admin-refresh-btn"
+                onClick={loadSupportRequests} disabled={supportLoading}>
+                <RefreshCw size={17} className={supportLoading ? 'admin-spinning' : ''} />
+                Làm mới
+              </button>
+            </div>
+          </div>
+
+          <div className="admin-toolbar" style={{ flexWrap: 'wrap' }}>
+            <div className="admin-search">
+              <Search size={19} />
+              <input type="search" value={supportSearch}
+                onChange={(event) => setSupportSearch(event.target.value)}
+                placeholder="Tìm tên, email, nội dung, mã yêu cầu..." />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>Trạng thái:</span>
+              <select value={supportStatus}
+                onChange={(event) => setSupportStatus(event.target.value)}
+                style={{ padding: '10px 12px', border: '1px solid #dbe4ff', borderRadius: 9 }}>
+                <option value="all">Tất cả</option>
+                {supportStatuses.map((status) =>
+                  <option key={status} value={status}>{status}</option>
+                )}
+              </select>
+            </label>
+          </div>
+
+          {supportError && <div className="admin-error" role="alert">
+            <AlertCircle size={18} /> {supportError}
+          </div>}
+          {supportLoading ? (
+            <div className="admin-empty">Đang tải yêu cầu hỗ trợ...</div>
+          ) : filteredSupportRequests.length === 0 ? (
+            <div className="admin-empty">
+              {supportRequests.length === 0
+                ? 'Chưa có yêu cầu hỗ trợ nào.'
+                : 'Không có yêu cầu phù hợp với bộ lọc.'}
+            </div>
+          ) : (
+            <div className="admin-faq-list">
+              {filteredSupportRequests.map((request, index) => {
+                const id = request.id ?? `index-${index}`;
+                const expanded = expandedSupportId === id;
+                const title = request.subject || request.title || request.question ||
+                  request.message || request.content || `Yêu cầu #${id}`;
+                const sender = request.student_name || request.full_name ||
+                  request.name || request.email || 'Chưa có tên người gửi';
+                const status = request.status ?? 'Chưa có trạng thái';
+                return (
+                  <article className={`admin-faq-item ${expanded ? 'expanded' : ''}`}
+                    key={id}>
+                    <button type="button" className="admin-faq-toggle"
+                      onClick={() => setExpandedSupportId(expanded ? null : id)}
+                      aria-expanded={expanded}>
+                      <div className="admin-faq-icon"><MessageCircle size={19} /></div>
+                      <div className="admin-faq-title">
+                        <small>{sender}</small>
+                        <strong>{String(title)}</strong>
+                      </div>
+                      <span className="admin-count-badge">{String(status)}</span>
+                      {expanded ? <ChevronUp size={19} /> : <ChevronDown size={19} />}
+                    </button>
+                    {expanded && (
+                      <div className="admin-faq-details">
+                        <h4>Chi tiết yêu cầu</h4>
+                        <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 3fr', gap: '12px 16px', overflowWrap: 'anywhere' }}>
+                          {Object.entries(request).filter(([, value]) =>
+                            value !== null && value !== undefined && typeof value !== 'object'
+                          ).map(([key, value]) => (
+                            <Fragment key={key}><dt style={{ fontWeight: 650 }}>{key}</dt><dd style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{String(value)}</dd></Fragment>
+                          ))}
+                        </dl>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </section>
 
       </div>
