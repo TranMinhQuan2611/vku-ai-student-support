@@ -1011,7 +1011,319 @@ app.post('/api/tts', async (req, res) => {
     });
   }
 });
+// ==========================================
+// SUPPORT REQUESTS - PHÂN LOẠI YÊU CẦU
+// ==========================================
 
+const SUPPORT_DEPARTMENTS = {
+  'Học phí': 'Phòng Kế hoạch - Tài chính',
+  'Đăng ký học phần': 'Phòng Đào tạo',
+  'Lịch thi': 'Phòng Đào tạo',
+  'Ký túc xá': 'Phòng Công tác Sinh viên',
+  'Học bổng': 'Phòng Công tác Sinh viên',
+  'Tài khoản sinh viên': 'Bộ phận Công nghệ Thông tin',
+  'Khác': 'Phòng Công tác Sinh viên'
+};
+
+const SUPPORT_STATUSES = [
+  'pending',
+  'in_progress',
+  'resolved',
+  'rejected'
+];
+
+const SUPPORT_PRIORITIES = [
+  'low',
+  'normal',
+  'high'
+];
+
+function cleanSupportText(value, maxLength) {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
+  return value.trim().slice(0, maxLength + 1);
+}
+
+// ==========================================
+// API: SINH VIÊN GỬI YÊU CẦU HỖ TRỢ
+// POST /api/support-requests
+// ==========================================
+
+app.post('/api/support-requests', async (req, res) => {
+  try {
+    const studentName = cleanSupportText(
+      req.body?.student_name,
+      150
+    );
+
+    const studentEmail = cleanSupportText(
+      req.body?.student_email,
+      255
+    );
+
+    const subject = cleanSupportText(
+      req.body?.subject,
+      255
+    );
+
+    const description = cleanSupportText(
+      req.body?.description,
+      5000
+    );
+
+    const category = cleanSupportText(
+      req.body?.category || 'Khác',
+      100
+    );
+
+    if (
+      !studentName ||
+      !studentEmail ||
+      !subject ||
+      !description
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Vui lòng nhập đầy đủ thông tin bắt buộc.'
+      });
+    }
+
+    if (
+      studentName.length > 150 ||
+      studentEmail.length > 255 ||
+      subject.length > 255 ||
+      description.length > 5000 ||
+      category.length > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Một hoặc nhiều trường vượt quá độ dài cho phép.'
+      });
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailPattern.test(studentEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email không đúng định dạng.'
+      });
+    }
+
+    if (!Object.hasOwn(SUPPORT_DEPARTMENTS, category)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Danh mục yêu cầu không hợp lệ.'
+      });
+    }
+
+    const assignedDepartment = SUPPORT_DEPARTMENTS[category];
+
+    const result = await pool.query(
+      `
+        INSERT INTO support_requests (
+          student_name,
+          student_email,
+          subject,
+          description,
+          category,
+          assigned_department
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING
+          id,
+          subject,
+          category,
+          assigned_department,
+          status,
+          priority,
+          created_at
+      `,
+      [
+        studentName,
+        studentEmail,
+        subject,
+        description,
+        category,
+        assignedDepartment
+      ]
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: 'Yêu cầu hỗ trợ đã được tiếp nhận.',
+      request: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Lỗi tạo yêu cầu hỗ trợ:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tiếp nhận yêu cầu hỗ trợ.'
+    });
+  }
+});
+
+// ==========================================
+// API: ADMIN XEM DANH SÁCH YÊU CẦU
+// GET /api/admin/support-requests
+// ==========================================
+
+app.get(
+  '/api/admin/support-requests',
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const result = await pool.query(
+        `
+          SELECT
+            id,
+            student_name,
+            student_email,
+            subject,
+            description,
+            category,
+            assigned_department,
+            status,
+            priority,
+            admin_response,
+            created_at,
+            updated_at
+          FROM support_requests
+          ORDER BY created_at DESC, id DESC
+          LIMIT 200
+        `
+      );
+
+      return res.json({
+        success: true,
+        total: result.rows.length,
+        requests: result.rows
+      });
+
+    } catch (error) {
+      console.error('Lỗi lấy yêu cầu hỗ trợ:', error);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể tải danh sách yêu cầu.'
+      });
+    }
+  }
+);
+
+// ==========================================
+// API: ADMIN CẬP NHẬT YÊU CẦU
+// PATCH /api/admin/support-requests/:id
+// ==========================================
+
+app.patch(
+  '/api/admin/support-requests/:id',
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+
+      if (!Number.isSafeInteger(id) || id <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'ID yêu cầu không hợp lệ.'
+        });
+      }
+
+      const { status, priority, admin_response } = req.body || {};
+
+      if (
+        status === undefined &&
+        priority === undefined &&
+        admin_response === undefined
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Không có dữ liệu cần cập nhật.'
+        });
+      }
+
+      if (
+        status !== undefined &&
+        !SUPPORT_STATUSES.includes(status)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Trạng thái không hợp lệ.'
+        });
+      }
+
+      if (
+        priority !== undefined &&
+        !SUPPORT_PRIORITIES.includes(priority)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mức ưu tiên không hợp lệ.'
+        });
+      }
+
+      if (
+        admin_response !== undefined &&
+        (
+          typeof admin_response !== 'string' ||
+          admin_response.length > 5000
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nội dung phản hồi không hợp lệ.'
+        });
+      }
+
+      const result = await pool.query(
+        `
+          UPDATE support_requests
+          SET
+            status = COALESCE($1, status),
+            priority = COALESCE($2, priority),
+            admin_response = COALESCE($3, admin_response),
+            updated_at = NOW()
+          WHERE id = $4
+          RETURNING *
+        `,
+        [
+          status ?? null,
+          priority ?? null,
+          admin_response === undefined
+            ? null
+            : admin_response.trim(),
+          id
+        ]
+      );
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy yêu cầu hỗ trợ.'
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: 'Đã cập nhật yêu cầu hỗ trợ.',
+        request: result.rows[0]
+      });
+
+    } catch (error) {
+      console.error('Lỗi cập nhật yêu cầu:', error);
+
+      return res.status(500).json({
+        success: false,
+        message: 'Không thể cập nhật yêu cầu hỗ trợ.'
+      });
+    }
+  }
+);
 // ==========================================
 // KHỞI ĐỘNG BACKEND
 // ==========================================
