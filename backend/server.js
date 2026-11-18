@@ -3,6 +3,7 @@ const cors = require('cors');
 const axios = require('axios');
 const { Pool } = require('pg');
 const path = require('path');
+const crypto = require('node:crypto');
 const { spawn } = require('child_process');
 
 const session = require('express-session');
@@ -1121,41 +1122,53 @@ app.post('/api/support-requests', async (req, res) => {
     }
 
     const assignedDepartment = SUPPORT_DEPARTMENTS[category];
+// Tạo mã tra cứu ngẫu nhiên gồm 32 byte (256 bit).
+const lookupToken = crypto.randomBytes(32).toString('hex');
 
+// Chỉ lưu giá trị băm SHA-256 vào PostgreSQL.
+const lookupTokenHash = crypto
+  .createHash('sha256')
+  .update(lookupToken)
+  .digest('hex');
     const result = await pool.query(
-      `
-        INSERT INTO support_requests (
-          student_name,
-          student_email,
-          subject,
-          description,
-          category,
-          assigned_department
-        )
-        VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING
-          id,
-          subject,
-          category,
-          assigned_department,
-          status,
-          priority,
-          created_at
-      `,
-      [
-        studentName,
-        studentEmail,
-        subject,
-        description,
-        category,
-        assignedDepartment
-      ]
-    );
+  `
+    INSERT INTO support_requests (
+      student_name,
+      student_email,
+      subject,
+      description,
+      category,
+      assigned_department,
+      lookup_token_hash
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING
+      id,
+      subject,
+      category,
+      assigned_department,
+      status,
+      priority,
+      created_at
+  `,
+  [
+    studentName,
+    studentEmail,
+    subject,
+    description,
+    category,
+    assignedDepartment,
+    lookupTokenHash
+  ]
+);
 
     return res.status(201).json({
       success: true,
       message: 'Yêu cầu hỗ trợ đã được tiếp nhận.',
-      request: result.rows[0]
+      request: {
+        ...result.rows[0],
+        lookup_token: lookupToken
+      }
     });
 
   } catch (error) {
