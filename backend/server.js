@@ -1035,7 +1035,8 @@ const SUPPORT_STATUSES = [
 const SUPPORT_PRIORITIES = [
   'low',
   'normal',
-  'high'
+  'high',
+  'urgent'
 ];
 
 function cleanSupportText(value, maxLength) {

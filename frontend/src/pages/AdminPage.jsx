@@ -73,7 +73,25 @@ function AdminPage() {
   const [supportSearch, setSupportSearch] = useState('');
   const [supportStatus, setSupportStatus] = useState('all');
   const [expandedSupportId, setExpandedSupportId] = useState(null);
+// ==========================================
+// CHỈNH SỬA YÊU CẦU HỖ TRỢ SINH VIÊN
+// ==========================================
 
+// ID yêu cầu đang chỉnh sửa
+const [editingSupportId, setEditingSupportId] = useState(null);
+
+// Dữ liệu đang chỉnh sửa
+const [supportForm, setSupportForm] = useState({
+  status: 'pending',
+  priority: 'normal',
+  admin_response: '',
+});
+
+// Trạng thái đang lưu
+const [savingSupport, setSavingSupport] = useState(false);
+
+// Thông báo kết quả
+const [supportFormMessage, setSupportFormMessage] = useState('');
 
   const [backendOnline, setBackendOnline] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -195,6 +213,73 @@ function AdminPage() {
   useEffect(() => {
     loadSupportRequests();
   }, [loadSupportRequests]);
+  // ==========================================
+// BẮT ĐẦU CHỈNH SỬA YÊU CẦU HỖ TRỢ
+// ==========================================
+
+const handleEditSupport = (request) => {
+  setEditingSupportId(request.id);
+
+  setSupportForm({
+    status: request.status || 'pending',
+    priority: request.priority || 'normal',
+    admin_response: request.admin_response || '',
+  });
+
+  setSupportFormMessage('');
+};
+
+// ==========================================
+// LƯU THAY ĐỔI YÊU CẦU HỖ TRỢ
+// ==========================================
+
+const handleUpdateSupportRequest = async (id) => {
+  if (savingSupport) return;
+
+  setSavingSupport(true);
+  setSupportFormMessage('');
+
+  try {
+    const response = await fetch(
+      `/api/admin/support-requests/${id}`,
+      {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(supportForm),
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok || data.success !== true) {
+      throw new Error(
+        data.message || 'Không thể cập nhật yêu cầu hỗ trợ.'
+      );
+    }
+
+    setSupportRequests((previous) =>
+      previous.map((request) =>
+        request.id === id ? data.request : request
+      )
+    );
+
+    setEditingSupportId(null);
+
+    setSupportFormMessage(
+      `Đã cập nhật thành công yêu cầu #${id}.`
+    );
+
+  } catch (error) {
+    setSupportFormMessage(
+      error.message || 'Đã xảy ra lỗi khi cập nhật.'
+    );
+  } finally {
+    setSavingSupport(false);
+  }
+};
 
   const supportStatuses = useMemo(() =>
     [...new Set(supportRequests.map((item) => String(item.status ?? 'Chưa có trạng thái')))],
@@ -1480,7 +1565,25 @@ function AdminPage() {
                     </button>
                     {expanded && (
                       <div className="admin-faq-details">
-                        <h4>Chi tiết yêu cầu</h4>
+                        <div
+  style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  }}
+>
+  <h4 style={{ margin: 0 }}>Chi tiết yêu cầu</h4>
+
+  <button
+    type="button"
+    className="admin-refresh-btn"
+    onClick={() => handleEditSupport(request)}
+  >
+    Chỉnh sửa
+  </button>
+</div>
                         <dl style={{ display: 'grid', gridTemplateColumns: 'minmax(120px, 1fr) 3fr', gap: '12px 16px', overflowWrap: 'anywhere' }}>
                           {Object.entries(request).filter(([, value]) =>
                             value !== null && value !== undefined && typeof value !== 'object'
@@ -1488,6 +1591,160 @@ function AdminPage() {
                             <Fragment key={key}><dt style={{ fontWeight: 650 }}>{key}</dt><dd style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{String(value)}</dd></Fragment>
                           ))}
                         </dl>
+                        {editingSupportId === request.id && (
+  <div
+    style={{
+      marginTop: 20,
+      padding: 20,
+      border: '1px solid #dbe4ff',
+      borderRadius: 12,
+      background: '#f8faff',
+    }}
+  >
+    <h4 style={{ marginTop: 0 }}>
+      Chỉnh sửa yêu cầu #{request.id}
+    </h4>
+
+    {/* TRẠNG THÁI */}
+    <div style={{ marginBottom: 16 }}>
+      <label
+        htmlFor={`support-status-${request.id}`}
+        style={{ display: 'block', marginBottom: 8 }}
+      >
+        Trạng thái xử lý
+      </label>
+
+      <select
+        id={`support-status-${request.id}`}
+        value={supportForm.status}
+        onChange={(event) =>
+          setSupportForm((previous) => ({
+            ...previous,
+            status: event.target.value,
+          }))
+        }
+        style={{
+          width: '100%',
+          padding: 12,
+          border: '1px solid #dbe4ff',
+          borderRadius: 8,
+        }}
+      >
+        <option value="pending">Chờ xử lý</option>
+        <option value="in_progress">Đang xử lý</option>
+        <option value="resolved">Đã giải quyết</option>
+        <option value="rejected">Từ chối</option>
+      </select>
+    </div>
+
+    {/* MỨC ƯU TIÊN */}
+    <div style={{ marginBottom: 16 }}>
+      <label
+        htmlFor={`support-priority-${request.id}`}
+        style={{ display: 'block', marginBottom: 8 }}
+      >
+        Mức độ ưu tiên
+      </label>
+
+      <select
+        id={`support-priority-${request.id}`}
+        value={supportForm.priority}
+        onChange={(event) =>
+          setSupportForm((previous) => ({
+            ...previous,
+            priority: event.target.value,
+          }))
+        }
+        style={{
+          width: '100%',
+          padding: 12,
+          border: '1px solid #dbe4ff',
+          borderRadius: 8,
+        }}
+      >
+        <option value="low">Thấp</option>
+        <option value="normal">Bình thường</option>
+        <option value="high">Cao</option>
+        <option value="urgent">Khẩn cấp</option>
+      </select>
+    </div>
+
+    {/* PHẢN HỒI ADMIN */}
+    <div style={{ marginBottom: 16 }}>
+      <label
+        htmlFor={`support-response-${request.id}`}
+        style={{ display: 'block', marginBottom: 8 }}
+      >
+        Nội dung phản hồi
+      </label>
+
+      <textarea
+        id={`support-response-${request.id}`}
+        value={supportForm.admin_response}
+        maxLength={5000}
+        onChange={(event) =>
+          setSupportForm((previous) => ({
+            ...previous,
+            admin_response: event.target.value,
+          }))
+        }
+        placeholder="Nhập nội dung phản hồi cho sinh viên..."
+        rows={5}
+        style={{
+          width: '100%',
+          padding: 12,
+          border: '1px solid #dbe4ff',
+          borderRadius: 8,
+          resize: 'vertical',
+          boxSizing: 'border-box',
+        }}
+      />
+    </div>
+
+    {/* NÚT THAO TÁC */}
+    <div
+      style={{
+        display: 'flex',
+        gap: 12,
+        flexWrap: 'wrap',
+      }}
+    >
+      <button
+        type="button"
+        className="admin-refresh-btn"
+        onClick={() => handleUpdateSupportRequest(request.id)}
+        disabled={savingSupport}
+      >
+        {savingSupport ? 'Đang lưu...' : 'Lưu thay đổi'}
+      </button>
+
+      <button
+        type="button"
+        className="admin-refresh-btn"
+        onClick={() => {
+          setEditingSupportId(null);
+          setSupportFormMessage('');
+        }}
+        disabled={savingSupport}
+      >
+        Hủy
+      </button>
+    </div>
+  </div>
+)}
+
+{supportFormMessage && (
+  <p
+    role="status"
+    style={{
+      marginTop: 12,
+      color: '#2563eb',
+      fontWeight: 500,
+    }}
+  >
+    {supportFormMessage}
+  </p>
+)}
                       </div>
                     )}
                   </article>
