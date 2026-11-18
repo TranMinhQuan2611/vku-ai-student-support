@@ -1182,6 +1182,76 @@ const lookupTokenHash = crypto
 });
 
 // ==========================================
+// ==========================================
+// API: SINH VIÊN TRA CỨU YÊU CẦU HỖ TRỢ
+// POST /api/support-requests/lookup
+// ==========================================
+
+app.post('/api/support-requests/lookup', async (req, res) => {
+  try {
+    const lookupToken = req.body?.lookup_token;
+
+    // Kiểm tra mã tra cứu
+    if (
+      typeof lookupToken !== 'string' ||
+      !/^[a-fA-F0-9]{64}$/.test(lookupToken)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Mã tra cứu không hợp lệ.'
+      });
+    }
+
+    // Băm mã tra cứu để so sánh với PostgreSQL
+    const lookupTokenHash = crypto
+      .createHash('sha256')
+      .update(lookupToken.toLowerCase())
+      .digest('hex');
+
+    // Tìm yêu cầu theo mã băm
+    const result = await pool.query(
+      `
+        SELECT
+          id,
+          subject,
+          category,
+          assigned_department,
+          status,
+          priority,
+          admin_response,
+          created_at,
+          updated_at
+        FROM support_requests
+        WHERE lookup_token_hash = $1
+        LIMIT 1
+      `,
+      [lookupTokenHash]
+    );
+
+    // Không tìm thấy yêu cầu
+    if (result.rowCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy yêu cầu với mã tra cứu này.'
+      });
+    }
+
+    // Trả kết quả cho sinh viên
+    return res.json({
+      success: true,
+      message: 'Tra cứu yêu cầu hỗ trợ thành công.',
+      request: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Lỗi tra cứu yêu cầu hỗ trợ:', error);
+
+    return res.status(500).json({
+      success: false,
+      message: 'Không thể tra cứu yêu cầu hỗ trợ.'
+    });
+  }
+});
 // API: ADMIN XEM DANH SÁCH YÊU CẦU
 // GET /api/admin/support-requests
 // ==========================================
