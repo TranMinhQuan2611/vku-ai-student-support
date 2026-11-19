@@ -42,7 +42,33 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  backend:
+    image: vku-ai-backend:1.0
+    container_name: vku-backend
+    restart: unless-stopped
 
+    ports:
+      - "127.0.0.1:3001:3001"
+
+    environment:
+      NODE_ENV: development
+      PORT: "3001"
+
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: vku_user
+      DB_NAME: vku_student_support
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook/student-question
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      n8n:
+        condition: service_started
 volumes:
   postgres_data:
   n8n_data:
