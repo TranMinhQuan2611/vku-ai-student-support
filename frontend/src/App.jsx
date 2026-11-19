@@ -21,6 +21,7 @@ import Sidebar from './components/Sidebar';
 import ChatPage from './pages/ChatPage';
 import FAQPage from './pages/FAQPage';
 import HistoryPage from './pages/HistoryPage';
+import SupportPage from './pages/SupportPage';
 
 // ==========================================
 // ADMIN PAGES
@@ -150,6 +151,7 @@ function App() {
         <Route path="/faq" element={<FAQPage />} />
 
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/support" element={<SupportPage />} />
       </Route>
 
       {/* ADMIN LOGIN */}

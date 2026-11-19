@@ -3,6 +3,7 @@ import {
   MessageCircle,
   BookOpen,
   History,
+  ClipboardList,
   Sparkles,
   ChevronRight,
   CircleHelp,
@@ -35,6 +36,12 @@ const menuItems = [
     icon: History,
     path: '/history',
   },
+  {
+  id: 'support',
+  label: 'Yêu cầu hỗ trợ',
+  icon: ClipboardList,
+  path: '/support',
+},
 ];
 
 // ==========================================
