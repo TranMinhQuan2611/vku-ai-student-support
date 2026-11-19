@@ -14,9 +14,8 @@ import {
 
 import './ChatPage.css';
 
-// Địa chỉ Backend
-const API_URL = 'http://localhost:3001/api/ask';
-const TTS_URL = 'http://localhost:3001/api/tts';
+const API_URL = '/api/ask';
+const TTS_URL = '/api/tts';
 
 // Các câu hỏi gợi ý
 const suggestions = [

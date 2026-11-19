@@ -13,7 +13,7 @@ import {
 
 import './FAQPage.css';
 
-const API_URL = 'http://localhost:3001/api/faqs';
+const API_URL = '/api/faqs';
 
 function FAQPage() {
   const [faqs, setFaqs] = useState([]);

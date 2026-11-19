@@ -16,7 +16,7 @@ import {
 
 import './HistoryPage.css';
 
-const API_URL = 'http://localhost:3001';
+const API_URL = '';
 
 function HistoryPage() {
   const [history, setHistory] = useState([]);
